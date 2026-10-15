@@ -25,6 +25,13 @@ shift
 BR=$BOARD_WORK/buildroot
 OUT=$BOARD_WORK/output
 export BR2_DL_DIR=~/bpi/dl
+# Keep git (WSL's) out of this repository during the build. Buildroot's
+# support/scripts/setlocalversion runs "git update-index --refresh" on the
+# BR2_EXTERNAL tree to put a version string into the build info: over /mnt/c
+# that refreshed all ~5,100 files for minutes, held .git/index.lock, and
+# collided with Windows git. Nothing in the image depends on that string.
+# Buildroot's own git use (package downloads) is outside $PROJ, so unaffected.
+export GIT_CEILING_DIRECTORIES="$PROJ"
 LOG=$BOARD_WORK/build.log
 mkdir -p "$BOARD_WORK"
 

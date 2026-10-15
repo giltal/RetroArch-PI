@@ -1,102 +1,139 @@
-# RetroOPI_Z3 — Project Instructions
+# RetroArch-PI — Project Instructions
 
 ## What This Is
 
-Retro gaming console firmware for the **Orange Pi Zero3, 2 GB** (Allwinner **H618**, 4× Cortex-A53
-@ 1.512 GHz (patch 0051: an overclock at stock 1.10 V for this speed bin, which stops at 1.416 GHz), **Mali-G31 MP2** at up to 600 MHz), output over **HDMI at 1920×1080**.
+Retro gaming console firmware for small ARM boards, output over **HDMI at 1920×1080**: a
+DRM/KMS launcher, RetroArch on the GPU and 21 libretro cores, built with Buildroot 2026.02.3
+on mainline Linux 6.18.53. **One tree, several boards:**
 
-It is a port of **RetroBPI_M2M** (`C:\BananaPi_Projects\RetroBPI_M2M`), a Banana Pi M2 Magic with
-a DSI panel. The userspace carries over: the launcher, RetroArch and 21 cores, the init scripts,
-DualShock 3 over Bluetooth, and the volume and clean-shutdown handling. The board layer (kernel,
-display, audio) is new.
+| Board (`build.sh` name) | SoC | Notes |
+|---|---|---|
+| Orange Pi Zero3 (`zero3`) | Allwinner H618, Mali-G31 MP2, 2 GB LPDDR4 | The reference board: almost every setting was measured on it |
+| KickPi K2B V2.2 (`k2b`) | Allwinner H618, Mali-G31 MP2, 2 GB DDR3 | Maxio MAE0621A PHY; V1 not supported; no eMMC |
+| Raspberry Pi 4 | BCM2711, V3D | Planned: its own family layer next to `board/h616` |
 
-- **Read `Context.md` first.** It covers the hardware, what differs from the reference, and the plan.
-- **Read the last entry of `DevelopmentLog.md`** before continuing work.
-- **Consult the reference's `DevelopmentLog.md`** before changing a core choice or a RetroArch
-  setting. Most settings here were measured there, and the log says why.
+History: a port of RetroBPI_M2M (Banana Pi M2 Magic). The K2B was first ported in its own tree
+(`C:\KickPI_Projects\K2B_RetroArch`) and merged here; that folder and
+`C:\OrangePI_Projects\RetroOPI_Z3` are **superseded** and kept only as a fallback.
 
-> Note: this is the **Zero3 (H618)**, *not* the "Zero 3W", which is an Allwinner A733 with a
-> PowerVR GPU and needs a completely different (vendor-BSP) approach.
+- **Read `Context.md` first**, then the board's notes in `docs/boards/<board>.md`.
+- **Read the last entry of `DevelopmentLog.md`** (shared work) and of the board's log in
+  `docs/log/<board>.md` before continuing.
+- Before changing a core choice, a RetroArch setting, a shader or a launcher behaviour, read
+  `docs/log/opi-zero3.md`: almost every setting was measured there, and the log says why.
+
+## Layers — put each change in the right one
+
+| Layer | What lives there |
+|---|---|
+| `package/`, `launcher/`, `tools/`, `board/common/` | Shared by every board: RetroArch + cores, launcher, tools, rootfs overlay, post-build/post-image, genimage |
+| `board/h616/` | Shared by the Allwinner H616/H618 boards: Armbian kernel patches, kernel fragment, U-Boot fragment and patches |
+| `board/<board>/` | Only that board: DT patches, PHY/board drivers, U-Boot board config, kernel `linux.config`, `extlinux.conf` |
+
+A fix found on one board belongs in the most generic layer it applies to. Both defconfigs are
+the same file apart from the board lines: change shared options in **both**, and keep the diff
+between them limited to the board identity and layer paths. A new board also needs an entry in
+`scripts/boards.sh`.
 
 ## Hard constraints
 
-- **Mainline Linux has no H616/H618 HDMI** (as of 6.18, and still in 2026-09). The HDMI, TCON-TV
-  and DE33 support comes from Armbian's patch set, vendored under
-  `buildroot-external/board/opi-zero3/patches/linux/`. Its `README.md` records the provenance and
-  the exact Armbian commit. **The kernel version is pinned to that patch set** (6.18.53); bump them
-  together.
+- **Mainline Linux has no H616/H618 HDMI.** HDMI, TCON-TV and DE33 come from Armbian's patch set
+  in `board/h616/patches/linux/` (provenance in its `README.md`). **The kernel is pinned to that
+  set** (6.18.53); bump them together.
 - **panfrost needs LLVM** in Mesa 26 (`BR2_PACKAGE_MESA3D_LLVM=y`). Without it Kconfig silently
   drops panfrost, GBM, EGL and GLES.
-- The **onboard Wi-Fi/BT (UWE5622)** needs an out-of-tree driver and is **not enabled**. Networking
-  is the onboard Ethernet. Bluetooth for the DS3 needs a USB BT dongle until the UWE5622 is brought in.
-- **Serial console:** the 3-pin debug header, 115200 8N1, 3.3 V. Keep it attached during bring-up.
+- **K2B: only the V2.2** (DDR3, Maxio MAE0621A). Armbian's `kickpi-k2b` DTS/U-Boot describe the
+  V1 (LPDDR4, RTL8211F). Ethernet needs kernel 0062 (Maxio driver) and 0064 (PI6 hog); without
+  them: "EMAC reset timeout", no eth0. eMMC is disabled and not supported.
+- **Onboard Wi-Fi/BT** has no mainline driver on either board and is **not enabled**. Networking
+  is the onboard Ethernet. The DS3 needs a USB BT dongle.
+- **Serial console** (115200 8N1, 3.3 V) is required for bring-up: a DRAM or DT failure shows
+  nothing on HDMI. On the K2B it is COM8 on this PC; `scripts/serial.ps1` is a minimal terminal.
 
 ## Development Environment
 
-- **Host OS:** Windows + WSL2 (Ubuntu 22.04). The layout is kept apart from the reference project's `~/bpi`:
-  - `~/opi/buildroot`: Buildroot 2026.02.3
-  - `~/opi/output`: the build (`O=`)
-  - `~/bpi/dl`: download cache, **shared** with the reference on purpose
-  - `~/opi/armbian-build`: sparse checkout of Armbian's sunxi-6.18 patches, the source of `patches/linux`
-- **Do not modify anything under `~/bpi`** except the shared `~/bpi/dl`. That is the reference project's tree.
-- **WSL command pattern:** `wsl bash /mnt/c/.../script.sh` from PowerShell. Put anything
-  non-trivial in a script file. `wsl bash -c '...'` from git-bash mangles `$vars`, pipes and `/mnt/c` paths.
+- **Host OS:** Windows + WSL2 (Ubuntu 22.04). Per-board work directories (`scripts/boards.sh`):
+  `~/zero3`, `~/k2b`, each with `buildroot/`, `output/` (`O=`), `build.log`, `board_ip`.
+  Buildroot outputs are not relocatable: never rename a work directory.
+  - `~/bpi/dl`: download cache, **shared** by all boards (and the old reference trees) on purpose.
+  - `~/k2b/armbian-build`: sparse, blob-less Armbian clone (the K2B files: Maxio, V2 U-Boot).
+    `~/opi/armbian-build`: the original sparse clone at `2843c11` (source of `h616/patches/linux`).
+- **Do not modify `~/bpi` or `~/opi`** (the old reference trees) except the shared `~/bpi/dl`.
+- **WSL clock: `systemd-timesyncd` must stay disabled** (`wsl -u root systemctl disable --now
+  systemd-timesyncd`; done 2026-10-14). With it on, it and Hyper-V's TimeSync step the clock back
+  and forth about every 30 s, make sees finished steps as stale, and packages are re-extracted over
+  their patched trees ("duplicate filename"). Fix: `<pkg>-dirclean`.
+- **WSL command pattern:** `wsl bash /mnt/c/.../script.sh` from **PowerShell**. Put anything
+  non-trivial in a script file. From git-bash, `wsl bash -c '...'` mangles `$vars`, pipes and
+  `/mnt/c` paths. **WSL `/tmp` does not persist between calls.**
 - **Backslashes get eaten one level** when generating files through heredocs or inline Python.
-  This bit this project on day one (a `sed` escape inside a C string in the launcher). Use the
-  Edit tool for any line that contains a backslash, and diff against the reference afterwards.
-- **Line endings:** `.gitattributes` forces LF. After writing any shell script, check with
-  `grep -rlI $'\r' .`.
+  Use the Edit tool for any line containing a backslash.
+- **Line endings:** `.gitattributes` makes every text file LF (`* text=auto eol=lf`), whatever
+  `core.autocrlf` says; three core patches are deliberately CRLF (`-text`). Check with
+  `git ls-files --eol` (look for `w/crlf`). **In this Git Bash, `grep $'\r'` does not match CR**:
+  it reported CRs in LF files. Python on Windows writes CRLF in text mode: use `newline=''`.
+- **Empty directories do not survive git** (`/opt/roms` was lost that way). Create them in
+  `post-build.sh`.
 
 ## Build
 
 ```bash
-wsl bash /mnt/c/OrangePI_Projects/RetroOPI_Z3/scripts/build.sh              # full image
-wsl bash /mnt/c/OrangePI_Projects/RetroOPI_Z3/scripts/build.sh defconfig    # re-apply defconfig
-wsl bash /mnt/c/OrangePI_Projects/RetroOPI_Z3/scripts/build.sh linux-rebuild
+wsl bash /mnt/c/RetroArch_PI/scripts/build.sh k2b              # full image
+wsl bash /mnt/c/RetroArch_PI/scripts/build.sh k2b defconfig    # re-apply defconfig
+wsl bash /mnt/c/RetroArch_PI/scripts/build.sh k2b linux-rebuild
 ```
 
-The log is `~/opi/build.log`. The result is `~/opi/output/images/sdcard.img`, copied to `firmware/`.
+The log is `<work>/build.log`. The result is `<work>/output/images/sdcard.img`, copied (xz) to
+`firmware/<board>/`. `RETROOPI_ROMS_SIZE_MB=2048 IMAGE_TAG=small` makes the small image.
+A board's first full build is several hours (LLVM, Mesa, cores).
 
-**After editing the defconfig**, confirm every line survived into `~/opi/output/.config`. Kconfig
-drops symbols whose dependencies are unmet **without any error**. That is how panfrost went
-missing.
+**After editing a defconfig**, confirm every line survived into `<work>/output/.config`. Kconfig
+drops symbols whose dependencies are unmet **without any error**.
 
 ## Board
 
-`scripts/board.sh` does status, push, kernel, run and ssh over Ethernet. Write the board IP to
-`~/opi/board_ip` once. Root password `retroopi` (a development credential). Images built on this
-machine include `~/.ssh/retroopi_ed25519.pub`, so key login works right after a reflash.
+`scripts/board.sh <board>` does status, push, kernel, run and ssh over Ethernet. Write the board IP
+to `<work>/board_ip` once. Root password `retroopi` (a development credential; Claude never types
+it; the user logs in on the serial console when needed). Images built on this machine include
+`~/.ssh/retroopi_ed25519.pub`, so key login works right after a flash. It refuses kernel/push
+while a game is running. U-Boot is updated by `dd` at 8 KB of the card over SSH: back up the
+8 KB–1 MiB region first, verify by reading back.
 
-**`core-info <core.so>`** (on the board) loads a libretro core and prints its `library_name` and
-every core option with its allowed values. Use it:
-- after adding or upgrading a core, to prove the `.so` actually loads on the target
-  (PPSSPP/Flycast built fine and then failed to dlopen);
-- before writing any `.opt` file, since invalid keys and values are silently ignored.
-  Flycast's keys are `reicast_*`, not `flycast_*`.
+**`core-info <core.so>`** (on the board) loads a libretro core and prints its options and allowed
+values. Use it before writing any `.opt` file; invalid keys and values are silently ignored.
 
 **Local packages** (`launcher/`, `tools/`) are not re-synced by a plain `make`. `build.sh` with no
-arguments dircleans them first. For a single-target build, run `retroopi-launcher-dirclean` yourself.
+target dircleans them first. For a single-target build, run `retroopi-launcher-dirclean` yourself.
 
-**The ROM card is the user's.** Never regenerate it. Anything new a card needs goes into
-`S46card`, which is strictly additive.
+**The ROM card is the user's.** Never regenerate or reflash it. Anything new a card needs goes into
+`S46card`, which is strictly additive. No downloading ROMs or BIOS files. Cover art fetched by
+`scripts/fetch-thumbnails.py --board <board>` stays in the git-ignored cache and is never committed.
+Images and cover art are shared from the user's OneDrive, not from this repo.
+
+Downloads, commits and pushes happen only when the user asks.
+
+## Naming
+
+Internal names stay `retroopi` (packages `retroopi-launcher`/`retroopi-tools`, the
+`BR2_EXTERNAL_RETROOPI_PATH` variable, hostname, binaries, `/etc/retroopi*`) so diffs and history
+stay readable. The project name is RetroArch-PI.
 
 ## Key Paths
 
 ```
-C:\OrangePI_Projects\RetroOPI_Z3
-  Context.md, DevelopmentLog.md, BUILDING.md
+C:\RetroArch_PI
+  README.md, BUILDING.md, Context.md, DevelopmentLog.md (shared work)
+  docs/  flashing.md, boards/<board>.md, log/<board>.md
   buildroot-external/
-    configs/opi_zero3_retro_defconfig
-    board/opi-zero3/
-      linux-retrogaming.config     kernel fragment on arm64 defconfig
-      patches/linux/               49 Armbian patches (HDMI, audio, GPU enable) + our 0050 (GPU OPP 600 MHz), 0051 (CPU cooling + 1512 MHz) + README.md
-      patches/mesa3d/              dril-for-headless-GBM (needed for kmsro)
-      rootfs_overlay/              init scripts, retroarch.cfg, BT config
-      post-build.sh                target/ invariants -- keep adding guards here
-    package/retroarch/             RetroArch + libretro cores (from the reference)
-    package/retroopi-launcher/     launcher package (SCREEN_W/H)
-  launcher/                        the launcher (C, DRM/KMS + SDL2_ttf)
-  tools/                           volumed, inject-input, seed-credit, core-info
-  scripts/                         build.sh, board.sh
-  firmware/                        build output (gitignored)
+    configs/  opi_zero3_retro_defconfig, kickpi_k2b_retro_defconfig
+    package/  retroarch (RetroArch + cores, Flycast/PPSSPP patches), retroopi-launcher, retroopi-tools
+    board/common/     rootfs_overlay/, post-build.sh (invariants), post-image.sh (exFAT), genimage.cfg,
+                      patches/ (bluez5_utils, libretro-fuse, mesa3d)
+    board/h616/       linux-retrogaming.config, uboot-fastboot.config,
+                      patches/linux (Armbian 0001-0052 + README), patches/uboot (kernel_addr_r)
+    board/opi-zero3/  linux.config, patches/linux (0046/0047/0050/0051), extlinux.conf
+    board/kickpi-k2b/ linux.config, patches/linux (0060-0065), patches/uboot (0001-0002), extlinux.conf
+  launcher/  tools/
+  scripts/   boards.sh, build.sh, board.sh, serial.ps1, fetch-thumbnails.py, gen-*.py
+  firmware/<board>/   build output (gitignored)
 ```
