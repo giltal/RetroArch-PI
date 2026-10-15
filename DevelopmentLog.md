@@ -44,3 +44,13 @@ What was done, in `C:\RetroArch_PI` (a clone of the Zero3 repo, so its 37 commit
    the board lines.
 5. **Docs:** README (supported boards and setups), BUILDING, CLAUDE.md, Context.md, flashing.md.
    Per-board context and logs moved to `docs/`.
+
+## 2026-10-15 — USB host drivers probe asynchronously (both boards)
+
+With a USB DS3 attached at power-on, the K2B's boot could stall about 0.8 s. EHCI
+registration waits on the USB core's EHCI/OHCI companion lock while the pad enumerates on
+another port, and the host drivers probed in the init thread.
+
+Both boards' extlinux.conf now have `driver_async_probe=ehci-platform,ohci-platform` (the K2B
+also keeps `dwmac-sun8i`). On the K2B, init went from 1.92 s to 1.11 s with the pad attached.
+Details in `docs/log/kickpi-k2b.md`.

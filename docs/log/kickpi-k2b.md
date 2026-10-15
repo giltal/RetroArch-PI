@@ -507,3 +507,23 @@ Over the day the launcher start went **5.64 → 5.13 s** from the SPL banner.
       (sun8i's EMAC reset already polls up to 100 ms);
     - a small kernel patch that skips the request from async context;
     - leave it.
+
+**USB DS3 boot stall: fixed** with `driver_async_probe=...,ehci-platform,ohci-platform`.
+- **Cause:** EHCI/OHCI `5101000`/`5101400` both registered at 1.632 s, about 120 ms after the
+  pad finished enumerating on the `5310000`/`5310400` pair. That is the USB core's EHCI/OHCI
+  companion lock: adding an EHCI hcd waits while a full-speed device is reset and enumerated
+  on another port.
+- The host drivers probe in the init thread, so PMIC, serial, GPU, EMAC and SD all waited.
+- It never showed before because the earlier boots won the race. The faster SPL/U-Boot and
+  the eMMC removal shifted the timing.
+- Tried first: `initcall_debug` via sed on the board. That failed, because BusyBox sed has
+  no `0,/re/` address; the file was restored unchanged.
+- **Result, three reboots with the pad attached:**
+  - controllers at 0.62/0.82 s
+  - SD at 1.01 s
+  - init at **1.11–1.12 s** (was 1.92 s)
+  - pad ready at about 1.5 s as before (it re-enumerates once at ~2.7 s, as it always did)
+  - link 1 Gbps
+- Also applied to the **Zero3**'s extlinux.conf (same H616 USB block, same race possible).
+  Untested on Zero3 hardware.
+- The async-probe `__request_module` WARNING is still open (see above).
