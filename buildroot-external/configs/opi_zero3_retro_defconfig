@@ -33,13 +33,13 @@ BR2_TARGET_GENERIC_GETTY_BAUDRATE_115200=y
 BR2_TARGET_GENERIC_ROOT_PASSWD="retroopi"
 BR2_ROOTFS_DEVICE_CREATION_DYNAMIC_EUDEV=y
 BR2_PACKAGE_BUSYBOX_SHOW_OTHERS=y
-BR2_ROOTFS_OVERLAY="$(BR2_EXTERNAL_RETROOPI_PATH)/board/opi-zero3/rootfs_overlay"
+BR2_ROOTFS_OVERLAY="$(BR2_EXTERNAL_RETROOPI_PATH)/board/common/rootfs_overlay $(BR2_EXTERNAL_RETROOPI_PATH)/board/opi-zero3/rootfs_overlay"
 # Two post-image scripts, run in order: ours builds the FAT32 ROM partition
 # image, then the stock wrapper assembles sdcard.img from genimage.cfg.
-BR2_ROOTFS_POST_BUILD_SCRIPT="$(BR2_EXTERNAL_RETROOPI_PATH)/board/opi-zero3/post-build.sh"
-BR2_ROOTFS_POST_IMAGE_SCRIPT="$(BR2_EXTERNAL_RETROOPI_PATH)/board/opi-zero3/post-image.sh support/scripts/genimage.sh"
-BR2_ROOTFS_POST_SCRIPT_ARGS="-c $(BR2_EXTERNAL_RETROOPI_PATH)/board/opi-zero3/genimage.cfg"
-BR2_GLOBAL_PATCH_DIR="$(BR2_EXTERNAL_RETROOPI_PATH)/board/opi-zero3/patches"
+BR2_ROOTFS_POST_BUILD_SCRIPT="$(BR2_EXTERNAL_RETROOPI_PATH)/board/common/post-build.sh"
+BR2_ROOTFS_POST_IMAGE_SCRIPT="$(BR2_EXTERNAL_RETROOPI_PATH)/board/common/post-image.sh support/scripts/genimage.sh"
+BR2_ROOTFS_POST_SCRIPT_ARGS="-c $(BR2_EXTERNAL_RETROOPI_PATH)/board/common/genimage.cfg"
+BR2_GLOBAL_PATCH_DIR="$(BR2_EXTERNAL_RETROOPI_PATH)/board/common/patches $(BR2_EXTERNAL_RETROOPI_PATH)/board/h616/patches $(BR2_EXTERNAL_RETROOPI_PATH)/board/opi-zero3/patches"
 
 # --- Kernel -------------------------------------------------------------
 # 6.18.53 exactly, because patches/linux/ is Armbian's set rebased onto that
@@ -48,7 +48,7 @@ BR2_LINUX_KERNEL=y
 BR2_LINUX_KERNEL_CUSTOM_VERSION=y
 BR2_LINUX_KERNEL_CUSTOM_VERSION_VALUE="6.18.53"
 BR2_LINUX_KERNEL_USE_ARCH_DEFAULT_CONFIG=y
-BR2_LINUX_KERNEL_CONFIG_FRAGMENT_FILES="$(BR2_EXTERNAL_RETROOPI_PATH)/board/opi-zero3/linux-retrogaming.config"
+BR2_LINUX_KERNEL_CONFIG_FRAGMENT_FILES="$(BR2_EXTERNAL_RETROOPI_PATH)/board/h616/linux-retrogaming.config $(BR2_EXTERNAL_RETROOPI_PATH)/board/opi-zero3/linux.config"
 BR2_LINUX_KERNEL_DTS_SUPPORT=y
 BR2_LINUX_KERNEL_INTREE_DTS_NAME="allwinner/sun50i-h618-orangepi-zero3"
 BR2_LINUX_KERNEL_INSTALL_TARGET=y
@@ -70,7 +70,7 @@ BR2_TARGET_UBOOT_BUILD_SYSTEM_KCONFIG=y
 BR2_TARGET_UBOOT_CUSTOM_VERSION=y
 BR2_TARGET_UBOOT_CUSTOM_VERSION_VALUE="2026.07"
 BR2_TARGET_UBOOT_BOARD_DEFCONFIG="orangepi_zero3"
-BR2_TARGET_UBOOT_CONFIG_FRAGMENT_FILES="$(BR2_EXTERNAL_RETROOPI_PATH)/board/opi-zero3/uboot-fastboot.config"
+BR2_TARGET_UBOOT_CONFIG_FRAGMENT_FILES="$(BR2_EXTERNAL_RETROOPI_PATH)/board/h616/uboot-fastboot.config"
 BR2_TARGET_UBOOT_NEEDS_DTC=y
 BR2_TARGET_UBOOT_NEEDS_PYLIBFDT=y
 BR2_TARGET_UBOOT_NEEDS_OPENSSL=y

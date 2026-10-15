@@ -2,17 +2,19 @@
 #
 # Talk to the board over Ethernet + SSH. Run inside WSL:
 #
-#   wsl bash /mnt/c/OrangePI_Projects/RetroOPI_Z3/scripts/board.sh <cmd> [args]
+#   wsl bash /mnt/c/RetroArch_PI/scripts/board.sh <board> <cmd> [args]
+#
+#   <board> is one of the names in scripts/boards.sh (zero3, k2b).
 #
 #   status                 hostname, uptime, IP, what is running, temps, DRM/ALSA
 #   push <path>...         copy target/ files (absolute board paths, e.g.
-#                          /usr/bin/retroopi_launcher) from ~/opi/output/target,
+#                          /usr/bin/retroopi_launcher) from <work>/output/target,
 #                          restarting the launcher around it; verifies md5
-#   kernel                 install Image + DTB + extlinux.conf, keeping .prev copies
+#   kernel                 install Image + DTB + extlinux.conf (from target/), keeping .prev copies
 #   run <script> [args]    copy a local shell script over, strip CR, run it
 #   ssh [cmd]              interactive shell, or one command
 #
-# Board address: $BOARD, else ~/opi/board_ip (write the IP there once).
+# Board address: $BOARD_IP, else <work>/board_ip (write the IP there once).
 #
 # Conventions carried over from the reference (RetroBPI_M2M scripts/):
 #  - never touch the board while a game is running: a launcher restart under
@@ -24,18 +26,21 @@
 #  - dropbear has no sftp-server, so scp needs -O (legacy protocol)
 set -eo pipefail
 
-BOARD=${BOARD:-$(cat ~/opi/board_ip 2>/dev/null || true)}
-[ -n "$BOARD" ] || { echo "board.sh: set BOARD=<ip> or write it to ~/opi/board_ip" >&2; exit 1; }
+PROJ=$(cd "$(dirname "$0")/.." && pwd)
+. "$PROJ/scripts/boards.sh" "${1:-}"
+shift
+BOARD_IP=${BOARD_IP:-$(cat "$BOARD_WORK/board_ip" 2>/dev/null || true)}
+[ -n "$BOARD_IP" ] || { echo "board.sh: set BOARD_IP=<ip> or write it to $BOARD_WORK/board_ip" >&2; exit 1; }
 
 KEY=~/.ssh/retroopi_ed25519
 O=(-o BatchMode=yes -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null
    -o ConnectTimeout=10 -o LogLevel=ERROR)
 [ -f "$KEY" ] && O+=(-i "$KEY")
 
-T=~/opi/output/target
-I=~/opi/output/images
+T=$BOARD_WORK/output/target
+I=$BOARD_WORK/output/images
 
-rsh()  { ssh "${O[@]}" "root@$BOARD" "$@"; }
+rsh()  { ssh "${O[@]}" "root@$BOARD_IP" "$@"; }
 rcp()  { scp -O "${O[@]}" "$@"; }
 
 game_running() {
@@ -68,7 +73,7 @@ push)
 	if game_running; then echo "ABORT: a game is running on the board."; exit 2; fi
 	for p in "$@"; do
 		[ -f "$T$p" ] || { echo "not in target/: $p" >&2; exit 1; }
-		rcp "$T$p" "root@$BOARD:/tmp/push.$$.$(basename "$p")"
+		rcp "$T$p" "root@$BOARD_IP:/tmp/push.$$.$(basename "$p")"
 	done
 	rsh "/etc/init.d/S12launcher stop >/dev/null 2>&1 || true"
 	# Write next to the target, sync, then rename over it. A rename is atomic,
@@ -90,19 +95,18 @@ push)
 	;;
 kernel)
 	if game_running; then echo "ABORT: a game is running on the board."; exit 2; fi
-	DTB=sun50i-h618-orangepi-zero3.dtb
-	R=/mnt/c/OrangePI_Projects/RetroOPI_Z3/buildroot-external/board/opi-zero3/rootfs_overlay
+	DTB=$BOARD_DTB
 	# Keep the last known-good set, so a bad kernel is recoverable from the
 	# U-Boot prompt on the serial console instead of by reflashing the card.
 	rsh "cd /boot && cp -n Image Image.prev && cp -n $DTB $DTB.prev && cp -n extlinux/extlinux.conf extlinux/extlinux.conf.prev; [ -f Image.lz4 ] && cp -n Image.lz4 Image.lz4.prev; true"
 	# extlinux.conf boots Image.lz4 and falls back to Image (see post-build.sh,
 	# which makes the image build's copy the same way).
-	LZ4="$HOME/opi/output/host/bin/lz4"; [ -x "$LZ4" ] || LZ4=$(command -v lz4)
+	LZ4="$BOARD_WORK/output/host/bin/lz4"; [ -x "$LZ4" ] || LZ4=$(command -v lz4)
 	"$LZ4" -9 -f -q "$I/Image" "$I/Image.lz4"
-	rcp "$I/Image.lz4" "root@$BOARD:/boot/Image.lz4.new"
-	rcp "$I/Image" "root@$BOARD:/boot/Image.new"
-	rcp "$I/$DTB" "root@$BOARD:/boot/$DTB.new"
-	rcp "$R/boot/extlinux/extlinux.conf" "root@$BOARD:/boot/extlinux/extlinux.conf.new"
+	rcp "$I/Image.lz4" "root@$BOARD_IP:/boot/Image.lz4.new"
+	rcp "$I/Image" "root@$BOARD_IP:/boot/Image.new"
+	rcp "$I/$DTB" "root@$BOARD_IP:/boot/$DTB.new"
+	rcp "$T/boot/extlinux/extlinux.conf" "root@$BOARD_IP:/boot/extlinux/extlinux.conf.new"
 	# Modules must match the kernel they were built with: a config change can
 	# add, remove or alter modules. Replace the tree wholesale.
 	KV=$(ls "$T/lib/modules" | head -1)
@@ -124,11 +128,11 @@ kernel)
 run)
 	[ -f "${1:-}" ] || { echo "usage: board.sh run <script> [args]" >&2; exit 1; }
 	s=$1; shift
-	rcp "$s" "root@$BOARD:/tmp/run.sh"
+	rcp "$s" "root@$BOARD_IP:/tmp/run.sh"
 	rsh "sed -i 's/\r\$//' /tmp/run.sh && sh /tmp/run.sh $*"
 	;;
 ssh)
-	if [ $# -eq 0 ]; then ssh "${O[@]/BatchMode=yes/BatchMode=no}" "root@$BOARD"; else rsh "$@"; fi
+	if [ $# -eq 0 ]; then ssh "${O[@]/BatchMode=yes/BatchMode=no}" "root@$BOARD_IP"; else rsh "$@"; fi
 	;;
 *)
 	sed -n '3,15p' "$0"; exit 1

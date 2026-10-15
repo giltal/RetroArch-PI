@@ -26,7 +26,7 @@
 Config.in   text eol=lf
 
 # init scripts and other extensionless files under the rootfs overlay
-buildroot-external/board/opi-zero3/rootfs_overlay/** text eol=lf
+buildroot-external/board/*/rootfs_overlay/** text eol=lf
 
 # Binaries: never touch.
 *.png       binary

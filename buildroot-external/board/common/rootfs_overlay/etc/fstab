@@ -9,7 +9,7 @@ sysfs		/sys		sysfs	defaults	0	0
 
 # ROM partition (SD card p2): FAT32 as built, or exFAT if reformatted in Windows. The launcher hardcodes /opt/roms and scans
 # one subdirectory per system; see launcher/launcher.c. Built and pre-populated
-# by board/opi-zero3/post-image.sh so the card is usable straight after flashing.
+# by board/common/post-image.sh so the card is usable straight after flashing.
 #
 # mmcblk0 is safe on the Zero3 because the SD slot is the only MMC host its DT
 # enables. The reference board had SD and SDIO Wi-Fi racing for the numbering,

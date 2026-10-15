@@ -3,11 +3,11 @@
 Fetch cover art for the games on the board's ROM card, for the launcher's
 preview panel.
 
-    python fetch-thumbnails.py [--dry-run] [--systems nes,snes,...] [--size 512]
+    python fetch-thumbnails.py --board k2b [--dry-run] [--systems nes,snes,...] [--size 512]
 
 Run it with Windows' python (it needs Pillow; WSL's python has none). It
-reaches the board through scripts/board.sh, so ~/opi/board_ip and the dev SSH
-key must be set up as usual.
+reaches the board through scripts/board.sh, so the board's board_ip (see
+scripts/boards.sh) and the dev SSH key must be set up as usual.
 
 What it does:
   1. Lists the games on the card (/opt/roms/<system>/), the thumbnails already
@@ -42,7 +42,10 @@ import urllib.parse
 import urllib.request
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-BOARD_SH = '/mnt/c/OrangePI_Projects/RetroOPI_Z3/scripts/board.sh'
+# board.sh next to this script, as WSL sees it (C:\x\y -> /mnt/c/x/y).
+_drive, _rest = os.path.splitdrive(os.path.join(HERE, 'board.sh'))
+BOARD_SH = '/mnt/' + _drive.rstrip(':').lower() + _rest.replace(os.sep, '/')
+BOARD = None    # board name from scripts/boards.sh, set by --board
 SERVER = 'https://thumbnails.libretro.com'
 CACHE = os.path.join(HERE, 'thumbnails-cache')
 CARD_DIR = '/opt/roms/_system/thumbnails'
@@ -90,7 +93,7 @@ SKIP_EXT = {'.txt', '.srm', '.sav', '.state', '.cfg', '.opt', '.xml', '.dat', '.
 def board(cmd, data=None):
     # -e: run bash directly. Without it wsl.exe passes the command through a shell,
     # which expands the $variables meant for the board.
-    r = subprocess.run(['wsl', '-e', 'bash', BOARD_SH, 'ssh', cmd], input=data, capture_output=True)
+    r = subprocess.run(['wsl', '-e', 'bash', BOARD_SH, BOARD, 'ssh', cmd], input=data, capture_output=True)
     if r.returncode != 0:
         sys.exit(f'board: {cmd!r} failed: {r.stderr.decode(errors="replace").strip()}')
     return r.stdout
@@ -191,11 +194,14 @@ def fetch(system, kind, name, size):
 
 
 def main():
+    global BOARD
     ap = argparse.ArgumentParser()
+    ap.add_argument('--board', required=True, help='board name from scripts/boards.sh (zero3, k2b)')
     ap.add_argument('--dry-run', action='store_true', help='match only: no download, no upload')
     ap.add_argument('--systems', help='comma-separated card folders (default: all)')
     ap.add_argument('--size', type=int, default=512, help='longest side in pixels (default 512)')
     args = ap.parse_args()
+    BOARD = args.board
 
     print('reading the card...')
     listing = board('cd /opt/roms && for d in */; do for f in "$d"*; do '

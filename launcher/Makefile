@@ -1,8 +1,8 @@
 # RetroOPI launcher — cross-compilation for Allwinner H618 (Cortex-A53, AArch64)
 #
 # Standalone build against the Buildroot toolchain:
-#   make SYSROOT=$HOME/opi/output/host/aarch64-buildroot-linux-gnu/sysroot \
-#        CROSS_COMPILE=$HOME/opi/output/host/bin/aarch64-buildroot-linux-gnu-
+#   make SYSROOT=$HOME/<board work dir>/output/host/aarch64-buildroot-linux-gnu/sysroot \
+#        CROSS_COMPILE=$HOME/<board work dir>/output/host/bin/aarch64-buildroot-linux-gnu-
 #
 # Output geometry (see launcher.c). It must be a mode the HDMI sink offers:
 #   make                              # 1280x720 default

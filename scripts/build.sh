@@ -1,27 +1,32 @@
 #!/bin/bash
 #
-# Build the RetroOPI_Z3 image in WSL.
+# Build a board's image in WSL.
 #
-#   wsl bash /mnt/c/OrangePI_Projects/RetroOPI_Z3/scripts/build.sh            # full build
-#   wsl bash /mnt/c/OrangePI_Projects/RetroOPI_Z3/scripts/build.sh linux      # one target
-#   wsl bash /mnt/c/OrangePI_Projects/RetroOPI_Z3/scripts/build.sh defconfig  # re-apply defconfig
+#   wsl bash /mnt/c/RetroArch_PI/scripts/build.sh <board>             # full build
+#   wsl bash /mnt/c/RetroArch_PI/scripts/build.sh <board> linux       # one target
+#   wsl bash /mnt/c/RetroArch_PI/scripts/build.sh <board> defconfig   # re-apply defconfig
 #
-# Layout (kept apart from the reference project's ~/bpi tree):
-#   ~/opi/buildroot   Buildroot 2026.02.3, cloned from ~/bpi/buildroot
-#   ~/opi/output      out-of-tree build (O=)
-#   ~/bpi/dl          download cache, SHARED with RetroBPI_M2M on purpose --
+# <board> is one of the names in scripts/boards.sh (zero3, k2b).
+#
+# Layout, per board (BOARD_WORK in boards.sh):
+#   <work>/buildroot  Buildroot 2026.02.3, cloned from ~/bpi/buildroot
+#   <work>/output     out-of-tree build (O=)
+#   ~/bpi/dl          download cache, SHARED by all boards on purpose --
 #                     Buildroot keys downloads by package and version, so sharing
 #                     is safe and saves re-fetching ~800 MB
 #
-# Output: ~/opi/output/images/sdcard.img. It is copied to firmware/ in the
-# project, which is gitignored.
+# Output: <work>/output/images/sdcard.img. It is copied to firmware/<board>/ in
+# the project, which is gitignored.
 set -eo pipefail
 
-PROJ=/mnt/c/OrangePI_Projects/RetroOPI_Z3
-BR=~/opi/buildroot
-OUT=~/opi/output
+PROJ=$(cd "$(dirname "$0")/.." && pwd)
+. "$PROJ/scripts/boards.sh" "${1:-}"
+shift
+BR=$BOARD_WORK/buildroot
+OUT=$BOARD_WORK/output
 export BR2_DL_DIR=~/bpi/dl
-LOG=~/opi/build.log
+LOG=$BOARD_WORK/build.log
+mkdir -p "$BOARD_WORK"
 
 if [ ! -d "$BR" ]; then
 	echo "build.sh: cloning Buildroot 2026.02.3 into $BR"
@@ -31,7 +36,7 @@ fi
 cd "$BR"
 
 if [ ! -f "$OUT/.config" ] || [ "${1:-}" = "defconfig" ]; then
-	make BR2_EXTERNAL="$PROJ/buildroot-external" O="$OUT" opi_zero3_retro_defconfig
+	make BR2_EXTERNAL="$PROJ/buildroot-external" O="$OUT" "$BOARD_DEFCONFIG"
 	[ "${1:-}" = "defconfig" ] && exit 0
 fi
 
@@ -65,7 +70,7 @@ else
 fi
 
 if [ $# -eq 0 ]; then
-	F="$PROJ/firmware"
+	F="$PROJ/firmware/$BOARD"
 	I="$OUT/images/sdcard.img"
 	mkdir -p "$F"
 	# IMAGE_TAG names the deliverable, so image variants can sit side by side:

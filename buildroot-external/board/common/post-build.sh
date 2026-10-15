@@ -152,7 +152,7 @@ ry=$(sed -n 's/^video_fullscreen_y = "\([0-9]*\)"/\1/p' "$racfg")
 # Every system folder the card is given must be a system the launcher knows,
 # checked in the BINARY: a local package can silently ship a stale build (see
 # build.sh). The list comes from post-image.sh, so the two cannot drift.
-systems=$(sed -n '/^SYSTEMS="/,/"$/p' "$BR2_EXTERNAL_RETROOPI_PATH/board/opi-zero3/post-image.sh" \
+systems=$(sed -n '/^SYSTEMS="/,/"$/p' "$BR2_EXTERNAL_RETROOPI_PATH/board/common/post-image.sh" \
 	| tr -d '"\\' | sed 's/^SYSTEMS=//' | tr ' ' '\n' | grep -v -E '^(_system)?$')
 # -n 2: folder names like gb, nes, psp are shorter than strings' default
 # minimum of 4 characters, and would never be printed.
@@ -204,15 +204,20 @@ done
 	&& [ "$(grep '^[[:space:]]*append ' "$ext" | sed 's/ retroopi\.boot=uncompressed$//' | sort -u | wc -l)" -eq 1 ] \
 	|| fail "extlinux.conf: the LZ4 and fallback labels' append lines differ"
 
-# Every line of the kernel config fragment must survive into the kernel's
+# Every line of the kernel config fragments must survive into the kernel's
 # .config. Kconfig overrides a request it cannot satisfy WITHOUT any error:
 # build #1 asked for SND=y and got =m throughout, because arm64 defconfig has
 # SOUND=m, and BT=y came out =m because of RFKILL=m.
-frag="$BR2_EXTERNAL_RETROOPI_PATH/board/opi-zero3/linux-retrogaming.config"
+# The fragments are layered (family, then board), so a later one may override
+# an earlier one: check the LAST value of each symbol across all of them.
+frags=$(sed -n 's/^BR2_LINUX_KERNEL_CONFIG_FRAGMENT_FILES="\(.*\)"$/\1/p' "$BR2_CONFIG" \
+	| sed "s#\$(BR2_EXTERNAL_RETROOPI_PATH)#$BR2_EXTERNAL_RETROOPI_PATH#g")
 kcfg=$(ls -d "$BUILD_DIR"/linux-[0-9]*/.config 2>/dev/null | head -1)
-if [ -f "$frag" ] && [ -f "$kcfg" ]; then
+if [ -n "$frags" ] && [ -f "$kcfg" ]; then
+	for f in $frags; do [ -f "$f" ] || fail "kernel config fragment missing: $f"; done
 	bad=0
-	for l in $(grep -E '^CONFIG_[A-Z0-9_]+=' "$frag"); do
+	for l in $(cat $frags | grep -E '^CONFIG_[A-Z0-9_]+=' \
+			| awk -F= '{ if (!($1 in v)) o[++n] = $1; v[$1] = $0 } END { for (i = 1; i <= n; i++) print v[o[i]] }'); do
 		grep -qxF "$l" "$kcfg" || {
 			echo "  wanted $l, got: $(grep "^${l%%=*}=" "$kcfg" || echo '<unset>')" >&2
 			bad=1

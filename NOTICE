@@ -21,7 +21,7 @@ their own upstreams at pinned revisions and remain under their own licences.
 
 Patches under buildroot-external/package/ and buildroot-external/board/*/patches/
 are modifications to those upstream works and inherit the licence of the file
-they modify. The kernel patches in buildroot-external/board/opi-zero3/patches/linux/
+they modify. The kernel patches in buildroot-external/board/h616/patches/linux/
 are vendored unmodified from the Armbian build framework (GPL-2.0); see the
 README.md in that directory for their provenance.
 
