@@ -42,3 +42,9 @@ fragments. See BUILDING.md, "How the boards share the tree".
 3. **Raspberry Pi 4:** a new family layer (`board/bcm2711`): Raspberry Pi firmware boot instead
    of U-Boot, its kernel, Mesa V3D instead of panfrost. The shared layers should need no change
    beyond what the GPU driver choice forces (Mesa options, RetroArch video settings).
+4. **N64: GoldenEye 007 and Perfect Dark on the dynamic recompiler.** They crash parallel-n64's
+   ARM64 new_dynarec (SIGTRAP 2 s after `Init new dynarec`; both run code from TLB-mapped
+   memory). parallel-n64 patch 0004 works around it: these two cartridge IDs (`GE`, `PD`) run on
+   the cached interpreter at 85–100% in their intros, which may dip in heavy scenes. The real
+   fix is in the dynarec's TLB handling on ARM64 (or evaluating mupen64plus-next for them);
+   then drop 0004. Details: `docs/log/kickpi-k2b.md`.
