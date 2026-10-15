@@ -8,6 +8,12 @@
 # silently matched nothing because the target file had CRLF.
 #
 # Force LF for everything the Linux side touches, regardless of core.autocrlf.
+#
+# Default: EVERY text file is LF in the working copy. The per-type rules below
+# came first and missed types (*.config, Makefile, extensionless files outside
+# the overlay): a clone on a machine with core.autocrlf=true checked 456 files
+# out as CRLF, the kernel fragment among them.
+*           text=auto eol=lf
 
 *.sh        text eol=lf
 *.py        text eol=lf
@@ -38,3 +44,8 @@ buildroot-external/board/*/rootfs_overlay/** text eol=lf
 *.tar.gz    binary
 *.bin       binary
 *.dtb       binary
+*.jpg       binary
+*.xz        binary
+
+# Upstream RetroArch asset that is CRLF in its own repository: keep it byte-exact.
+buildroot-external/package/retroarch/retroarch/retro-assets/nxrgui/overlay/README.txt -text
