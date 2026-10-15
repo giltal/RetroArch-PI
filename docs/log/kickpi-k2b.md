@@ -477,3 +477,33 @@ Left before the kernel: SPL loading U-Boot 0.6 s, the Image read 0.8 s and the L
 | Launcher start | 5.23 s | **5.13 s** |
 
 Over the day the launcher start went **5.64 → 5.13 s** from the SPL banner.
+
+---
+
+## 2026-10-15 — After the merge into RetroArch-PI
+
+- **User stopwatch: 6 s** power-on to menu (was 7–8 s), with the boot-time and eMMC changes.
+- **Board synced to the RetroArch-PI build** (`~/k2b` re-pointed at `C:\RetroArch_PI`):
+  - DTB and U-Boot `.config` are byte-identical to the K2B tree's.
+  - The kernel only drops `MOTORCOMM_PHY`, which now lives in the Zero3 layer.
+  - Installed with `board.sh k2b kernel` and pushed fstab/issue/card README/volumed.
+  - Left alone: `Atari800.opt` (RetroArch rewrote it at runtime with every option) and
+    passwd/group/shadow (image-time accounts).
+  - Reboot checks: Maxio PHY, 1 Gbps, ROM card, launcher, volumed on the power key all OK.
+- **Open: a USB-attached DS3 can cost about 0.9 s of boot.**
+  - On this boot the initcall sequence went quiet from 0.69 to 1.63 s while the pad
+    enumerated (`usb 3-1`, OHCI 5310400) and hid-sony set it up (to 1.50 s).
+  - EHCI/OHCI 5101000, the EMAC and the SD controller all moved about 0.9 s later
+    (init at 1.92 s, against 1.11 s).
+  - In the fast boots the pad was on bus 5 or not enumerated yet. So it depends on the port
+    and on timing. Candidate fix: `driver_async_probe=sony` (and whatever blocks before the
+    5101000 host). To measure: pad on each port, and no pad.
+- **Open: `WARNING ... __request_module` at every boot**, from `driver_async_probe=dwmac-sun8i`.
+  - `phy_device_create()` requests an `mdio:` module alias from the async probe worker, which
+    kmod warns about (deadlock guard).
+  - Harmless: Maxio is built in and binds, and nothing loads.
+  - Options:
+    - drop the async probe and remove the Maxio driver's `msleep(100)` in probe instead
+      (sun8i's EMAC reset already polls up to 100 ms);
+    - a small kernel patch that skips the request from async context;
+    - leave it.
