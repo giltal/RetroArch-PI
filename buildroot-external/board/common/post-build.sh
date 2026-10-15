@@ -84,6 +84,11 @@ echo "$romline" | awk '{exit !($3 == "auto")}' \
 if echo "$romline" | grep -qE 'shortname=|[,[:space:]]utf8([,[:space:]]|$)|codepage='; then
 	fail "vfat-only option on the ROM partition breaks exFAT: $romline"
 fi
+# The mount point itself. It used to ship as an EMPTY overlay directory, which
+# git does not track: a fresh tree (the K2B port, seeded with git archive) lost
+# it, and the first K2B boot failed the ROM mount with "No such file or
+# directory" (no games). Created here so it can never depend on git again.
+mkdir -p "$TARGET_DIR/opt/roms"
 
 # Shader presets referenced by the per-system defaults must exist, or RetroArch
 # silently falls back to the plain picture.
@@ -151,15 +156,20 @@ ry=$(sed -n 's/^video_fullscreen_y = "\([0-9]*\)"/\1/p' "$racfg")
 
 # Every system folder the card is given must be a system the launcher knows,
 # checked in the BINARY: a local package can silently ship a stale build (see
-# build.sh). The list comes from post-image.sh, so the two cannot drift.
-systems=$(sed -n '/^SYSTEMS="/,/"$/p' "$BR2_EXTERNAL_RETROOPI_PATH/board/common/post-image.sh" \
+# build.sh). The list comes from S46card, which creates the folders (the exFAT
+# partition is built empty), so the two cannot drift.
+[ -f "$TARGET_DIR/usr/share/retroopi/card-README.txt" ] \
+	|| fail "no /usr/share/retroopi/card-README.txt (S46card copies it to the card)"
+systems=$(sed -n '/^SYSTEMS="/,/"$/p' "$TARGET_DIR/etc/init.d/S46card" \
 	| tr -d '"\\' | sed 's/^SYSTEMS=//' | tr ' ' '\n' | grep -v -E '^(_system)?$')
+[ "$(printf '%s\n' "$systems" | wc -l)" -ge 20 ] \
+	|| fail "S46card SYSTEMS list looks truncated: $(echo $systems)"
 # -n 2: folder names like gb, nes, psp are shorter than strings' default
 # minimum of 4 characters, and would never be printed.
 lstr=$(strings -n 2 "$TARGET_DIR/usr/bin/retroopi_launcher")
 for s in $systems; do
 	printf '%s\n' "$lstr" | grep -qx "$s" \
-		|| fail "launcher binary has no '$s' system entry -- stale build, or post-image.sh and launcher.c disagree"
+		|| fail "launcher binary has no '$s' system entry -- stale build, or S46card and launcher.c disagree"
 done
 
 # The launcher's symbol fallback font, at the path it hard-codes
@@ -179,7 +189,11 @@ grep -q ' cma=[0-9]*M' "$TARGET_DIR/boot/extlinux/extlinux.conf" \
 # target writes the legacy LZ4 format, which booti does not recognise). The
 # plain Image stays as extlinux.conf's fallback label: if the LZ4 one ever
 # fails to boot, U-Boot tries the next label instead of stopping.
-if [ "$TARGET_DIR/boot/Image" -nt "$TARGET_DIR/boot/Image.lz4" ]; then
+# The explicit ! -f matters: this is /bin/sh (dash on the build host), where
+# "a -nt b" is FALSE when b does not exist (bash says true), so a fresh build
+# never made Image.lz4 and the header check below failed.
+if [ ! -f "$TARGET_DIR/boot/Image.lz4" ] \
+	|| [ "$TARGET_DIR/boot/Image" -nt "$TARGET_DIR/boot/Image.lz4" ]; then
 	LZ4="$HOST_DIR/bin/lz4"
 	[ -x "$LZ4" ] || LZ4="$(command -v lz4 || true)"
 	[ -n "$LZ4" ] || fail "lz4 not found (Buildroot's host lz4, or the build host's)"

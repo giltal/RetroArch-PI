@@ -1,0 +1,23 @@
+From: K2B_RetroArch
+Subject: [PATCH] sunxi: arm64: load the kernel 2 MiB aligned
+
+booti places an arm64 Image at a 2 MiB-aligned address. With kernel_addr_r
+at DRAM + 512 KiB it decompresses the LZ4 kernel there and then moves the
+whole 44.7 MB Image up to DRAM + 2 MiB: "Moving Image from 0x40080000 to
+0x40200000", 0.30 s of every boot on the K2B (serial, host-timestamped).
+Load at DRAM + 2 MiB and there is nothing to move. The decompressed Image
+then ends at ~0x42f60000, still below kernel_comp_addr_r (DRAM + 64 MiB)
+where booti keeps the compressed copy.
+
+---
+--- a/include/configs/sunxi-common.h
++++ b/include/configs/sunxi-common.h
+@@ -78,7 +78,7 @@
+  * Scripts, PXE and DTBs should go afterwards, leaving the rest for the initrd.
+  */
+ #define BOOTM_SIZE        __stringify(0xa000000)
+-#define KERNEL_ADDR_R     __stringify(SDRAM_OFFSET(0080000))
++#define KERNEL_ADDR_R     __stringify(SDRAM_OFFSET(0200000))
+ #define KERNEL_COMP_ADDR_R __stringify(SDRAM_OFFSET(4000000))
+ #define KERNEL_COMP_SIZE  __stringify(0xb000000)
+ #define FDT_ADDR_R        __stringify(SDRAM_OFFSET(FA00000))

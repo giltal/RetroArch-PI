@@ -7,9 +7,14 @@
 # So anything a newer image adds to the card layout is added here instead, at
 # boot, strictly ADDITIVELY: nothing on the card is ever deleted or renamed.
 #
-#  1. System folders that newer images know about (psp, dreamcast, ...). The
-#     launcher hides empty systems, so an empty folder costs nothing and saves
-#     creating it by hand from Windows.
+#  1. Every system folder the launcher knows, plus _system/{states,bios,bios/dc}
+#     and README.txt. The image's exFAT partition is created EMPTY (mtools
+#     cannot write exFAT; see post-image.sh), so on a freshly flashed card this
+#     is what lays the folders out, and on an older card it adds the systems
+#     newer images know about. The launcher hides empty systems, so an empty
+#     folder costs nothing and saves creating it by hand from Windows.
+#     Keep SYSTEMS in step with launcher/launcher.c: post-build.sh checks
+#     every name here against the launcher binary.
 #  2. PPSSPP's assets. The PSP core reads fonts, the PPGe UI atlas, language
 #     files and shaders from <system_directory>/PPSSPP, and system_directory is
 #     /opt/roms/_system/bios. They ship in the rootfs (/usr/share/ppsspp/PPSSPP)
@@ -22,7 +27,12 @@
 # within seconds of the very first boot might not find its fonts yet.
 
 ROMS=/opt/roms
-SYSTEMS="psp dreamcast"
+# Only systems we actually ship a core for: a folder whose core is missing is
+# a place ROMs go and never appear.
+SYSTEMS="nes snes gb gbc gba genesis mastersystem gamegear atari2600 atari7800
+atari800 pce pcesupergrafx zxspectrum doom neogeo cps1 cps2 cps3 arcade mame
+n64 psx psp dreamcast"
+README=/usr/share/retroopi/card-README.txt
 SRC=/usr/share/ppsspp/PPSSPP
 DST=$ROMS/_system/bios/PPSSPP
 STAMP="$DST/.retroopi-assets"
@@ -37,8 +47,11 @@ case "$1" in
 		for s in $SYSTEMS; do
 			[ -d "$ROMS/$s" ] || { mkdir -p "$ROMS/$s" && made="$made $s"; }
 		done
-		[ -d "$ROMS/_system/bios/dc" ] || { mkdir -p "$ROMS/_system/bios/dc" && made="$made _system/bios/dc"; }
+		for s in _system/states _system/bios/dc; do
+			[ -d "$ROMS/$s" ] || { mkdir -p "$ROMS/$s" && made="$made $s"; }
+		done
 		[ -n "$made" ] && printf "added folders:%s; " "$made"
+		[ -e "$ROMS/README.txt" ] || { cp "$README" "$ROMS/README.txt" && printf "added README.txt; "; }
 
 		if [ -d "$SRC" ]; then
 			want=$(cat "$SRC/.version" 2>/dev/null || echo unknown)

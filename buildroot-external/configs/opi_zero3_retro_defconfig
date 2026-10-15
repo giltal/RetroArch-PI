@@ -103,6 +103,8 @@ BR2_PACKAGE_DOSFSTOOLS=y
 # dosfstools installs NOTHING without this sub-option. The reference shipped
 # without fsck.fat for weeks and could not clear a stale FAT dirty flag.
 BR2_PACKAGE_DOSFSTOOLS_FSCK_FAT=y
+# The ROM partition is exFAT as built (post-image.sh): fsck.exfat to match.
+BR2_PACKAGE_EXFATPROGS=y
 
 # --- Mesa/panfrost: GPU acceleration ------------------------------------
 # Mali-G31 is Bifrost, which panfrost drives at GLES 3.1. That is a real step
@@ -241,6 +243,6 @@ BR2_PACKAGE_LINUX_FIRMWARE_RTL_88XX_BT=y
 # --- Host tools for image assembly --------------------------------------
 BR2_PACKAGE_HOST_DOSFSTOOLS=y
 BR2_PACKAGE_HOST_GENIMAGE=y
-BR2_PACKAGE_HOST_MTOOLS=y
+BR2_PACKAGE_HOST_EXFATPROGS=y
 BR2_PACKAGE_HOST_UBOOT_TOOLS=y
 BR2_PACKAGE_RETROOPI_TOOLS=y

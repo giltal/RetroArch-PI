@@ -7,14 +7,15 @@ tmpfs		/tmp		tmpfs	mode=1777	0	0
 tmpfs		/run		tmpfs	mode=0755,nosuid,nodev	0	0
 sysfs		/sys		sysfs	defaults	0	0
 
-# ROM partition (SD card p2): FAT32 as built, or exFAT if reformatted in Windows. The launcher hardcodes /opt/roms and scans
-# one subdirectory per system; see launcher/launcher.c. Built and pre-populated
-# by board/common/post-image.sh so the card is usable straight after flashing.
+# ROM partition (SD card p2): exFAT as built (post-image.sh), or FAT32 if reformatted. The launcher hardcodes /opt/roms and scans
+# one subdirectory per system; see launcher/launcher.c. Built empty by
+# board/common/post-image.sh; /etc/init.d/S46card creates the folders on first boot.
 #
-# mmcblk0 is safe on the Zero3 because the SD slot is the only MMC host its DT
-# enables. The reference board had SD and SDIO Wi-Fi racing for the numbering,
-# and this entry pointed at the wrong device until mmc aliases pinned it. Revisit
-# if the UWE5622 Wi-Fi (mmc1) is ever enabled.
+# mmcblk0 must be the SD card. With more than one MMC host enabled, numbering
+# follows probe order unless the board's DT pins it with mmc aliases (K2B: SD +
+# SDIO Wi-Fi, kernel patch 0063). The Zero3 enables only the SD slot. The
+# reference board had SD and SDIO racing, and this entry pointed at the wrong
+# device until aliases pinned it.
 #
 # umask=0022 rather than the vfat default so ROMs are world-readable; FAT has no
 # permission bits of its own, so they come from the mount options.

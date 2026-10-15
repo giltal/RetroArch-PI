@@ -49,3 +49,11 @@ buildroot-external/board/*/rootfs_overlay/** text eol=lf
 
 # Upstream RetroArch asset that is CRLF in its own repository: keep it byte-exact.
 buildroot-external/package/retroarch/retroarch/retro-assets/nxrgui/overlay/README.txt -text
+
+# These patches target upstream files that are CRLF, so their hunk lines must
+# carry CRLF too. Under "eol=lf" git normalised them and patch failed with
+# "different line endings": RetroOPI_Z3 only built from its working copy (its
+# index held LF versions), and a fresh tree (the K2B port) broke on all three.
+buildroot-external/package/retroarch/libretro-atari800/0001-atari800-vkbd-on-R-as-well-as-L3.patch -text
+buildroot-external/package/retroarch/libretro-fbalpha/0001-pgm-Support-threaded-draw-and-bind-it-to-cpu-0.patch -text
+buildroot-external/package/retroarch/libretro-mame2010/0001-Skip-cpu-settings-for-buildroot.patch -text

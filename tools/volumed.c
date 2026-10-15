@@ -46,6 +46,10 @@
 
 #define PAD_NAME    "Sony PLAYSTATION(R)3 Controller"
 #define PEK_NAME    "axp20x-pek"
+/* The K2B's power button is not on the PMIC: it is a GPIO (PC2) driven by
+ * gpio-keys-polled, reporting the same KEY_POWER. Either device is "the power
+ * key"; whichever exists is watched. */
+#define GPIOKEY_NAME "gpio-keys-polled"
 #define STATE_FILE  "/opt/roms/_system/state.txt"
 
 /* The launcher owns this control, so volumed MUST use the same one on the same
@@ -203,6 +207,8 @@ int main(void)
 		}
 		if (pek < 0)
 			pek = open_by_name(PEK_NAME);
+		if (pek < 0)
+			pek = open_by_name(GPIOKEY_NAME);
 
 		if (pad >= 0) { pfd[n].fd = pad; pfd[n].events = POLLIN; pad_i = n++; }
 		if (pek >= 0) { pfd[n].fd = pek; pfd[n].events = POLLIN; pek_i = n++; }
