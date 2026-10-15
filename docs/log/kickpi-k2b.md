@@ -567,3 +567,24 @@ was the top of the table.
   - The lockstep speed measurement moved to `scripts/benchmark-tests.txt`. It runs on request
     only, and `release-test.sh` warns that the sound will be choppy.
   - `release-test.sh` now traps interrupts, stops the board-side run and restarts the launcher.
+
+### GoldenEye 007 and Perfect Dark: parallel-n64 0004 (shared core, both boards)
+
+- **The crash:** SIGTRAP (exit status 133) within 2–3 s of parallel-n64's `Init new dynarec`.
+  Test matrix on the board (the `.opt` was backed up and restored around each run):
+  - It does not depend on the GFX plugin (rice or gln64), nor on the Expansion Pak setting.
+  - **Perfect Dark crashes the same way.** Conker, Banjo-Tooie and Majora's Mask run on the
+    dynarec at ~99–100%.
+  - Both crashing games run their code from TLB-mapped memory, which the ARM64 new_dynarec
+    evidently doesn't handle.
+- **The workaround:** with `cpucore = cached_interpreter`, GoldenEye runs: 96.5–99.8% in the
+  intro.
+- **Fix, `libretro-paralleln64/0004`:** in `main_init()`, if the dynarec is selected and the
+  cartridge ID (header 0x3C–0x3D) is `GE` or `PD`, use the cached interpreter and log a warning.
+  - It matches on the ID rather than the file name, so it works for any region and any file
+    name.
+  - The user's ROMs report `GOLDENEYE`/`NGEE` and `Perfect Dark`/`NPDE`.
+- **Verified on the board** (30 s each):
+  - GoldenEye 87.6–100.2% and Perfect Dark 84.6–99.1%, both on the cached interpreter.
+  - Super Mario 64 still on the dynarec at 100.2%.
+  - Gameplay speed still to be judged by the user.

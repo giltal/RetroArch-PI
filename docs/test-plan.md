@@ -127,8 +127,10 @@ sweep no longer uses. Temperatures 55–64 °C (3–4 °C above stock). Title sc
 run at full speed either way, so the sweep shows no gain; a gain shows in play and in the
 benchmark (part 3).
 
-Open: **GoldenEye 007** exits 2 s after `Init new dynarec` with status 133 (SIGTRAP) in
-parallel-n64, at both clocks. Not in the Zero3's log, so probably never tried there.
+**GoldenEye 007** (and Perfect Dark) crashed parallel-n64's ARM64 dynarec (SIGTRAP 2 s after
+`Init new dynarec`). Fixed by parallel-n64 patch 0004: these two cartridge IDs run on the cached
+interpreter. Verified: GoldenEye 87.6–100.2%, Perfect Dark 84.6–99.1% in their intros (expect
+WARN rather than PASS in the sweep), Super Mario 64 still on the dynarec at 100%.
 
 ### Orange Pi Zero3
 
