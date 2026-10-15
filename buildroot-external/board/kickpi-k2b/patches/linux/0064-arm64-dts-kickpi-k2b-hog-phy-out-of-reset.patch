@@ -1,0 +1,49 @@
+From: K2B_RetroArch
+Subject: [PATCH] arm64: dts: kickpi-k2b: hold the PHY out of reset from early boot
+
+The K2B V2.2's MAE0621A must answer its ID read for its driver (0062) to
+bind, and that driver is what starts the RGMII RX clock the EMAC reset
+needs. With PI6 as the PHY node's reset-gpios it is still low at the ID
+read (our U-Boot has networking off and leaves it low). As the MDIO bus's
+reset-gpios it is pulsed and the scan runs 100 ms later, and the PHY does
+not answer that soon either. Both ended in "EMAC reset timeout".
+Hog PI6 high instead, from pin controller registration on, and never
+pulse it. Verified on the board: with the PHY long out of reset, ID
+0x7b744411, MAE0621A-Q2C bound, link 1 Gbps.
+
+---
+--- a/arch/arm64/boot/dts/allwinner/sun50i-h618-kickpi-k2b.dts
++++ b/arch/arm64/boot/dts/allwinner/sun50i-h618-kickpi-k2b.dts
+@@ -199,12 +199,29 @@
+ };
+ 
+ &mdio0 {
++	/* No reset-gpios: PI6 is hogged high below. K2B_RetroArch 0064. */
+ 	ext_rgmii_phy: ethernet-phy@0 {
+ 		compatible = "ethernet-phy-ieee802.3-c22";
+ 		reg = <0x0>;
+-		reset-assert-us = <20000>;
+-		reset-deassert-us = <100000>;
+-		reset-gpios = <&pio 8 6 GPIO_ACTIVE_LOW>; /* PI6 */
++	};
++};
++
++&pio {
++	/*
++	 * PI6 is the MAE0621A's nRESET. Keep it released from the moment the
++	 * pin controller registers, about 0.8 s before the EMAC probes, and
++	 * never pulse it. The PHY must answer its ID read for its driver
++	 * (0062) to bind, and that driver starts the RGMII RX clock the EMAC
++	 * reset needs. Measured on the board: 100 ms after a reset pulse the
++	 * ID read still fails (PHY-node and bus-level reset-gpios both ended
++	 * in "EMAC reset timeout"); with the PHY long out of reset it reads
++	 * 0x7b744411 and the link comes up at 1 Gbps.
++	 */
++	emac0-phy-nreset-hog {
++		gpio-hog;
++		gpios = <8 6 GPIO_ACTIVE_HIGH>;
++		output-high;
++		line-name = "emac0-phy-nreset";
+ 	};
+ };
+ 

@@ -1,0 +1,47 @@
+From: K2B_RetroArch
+Subject: [PATCH] arm64: dts: kickpi-k2b: drop disabled spi1, uart2, uart5
+
+Their pinctrl groups (spi1_cs1_pin, uart2_ph_pins, uart5_pins) come from
+Armbian's own sun50i-h616.dtsi additions, which this tree does not carry,
+so dtc fails on the references. All three are status = "disabled" and
+unused by a console image.
+
+---
+--- a/arch/arm64/boot/dts/allwinner/sun50i-h618-kickpi-k2b.dts	2026-10-07 17:45:26.976927861 +0300
++++ b/arch/arm64/boot/dts/allwinner/sun50i-h618-kickpi-k2b.dts	2026-10-07 17:45:57.325511091 +0300
+@@ -368,17 +368,6 @@
+ 	};
+ };
+ 
+-&spi1 {
+-	status = "disabled";
+-	pinctrl-0 = <&spi1_pins>, <&spi1_cs1_pin>;
+-	pinctrl-names = "default";
+-
+-	spidev@1 {
+-		compatible = "rohm,dh2228fv";
+-		reg = <1>;
+-		spi-max-frequency = <1000000>;
+-	};
+-};
+ 
+ &uart0 {
+ 	status = "okay";
+@@ -394,17 +383,7 @@
+ 	uart-has-rtscts;
+ };
+ 
+-&uart2 {
+-	status = "disabled";
+-	pinctrl-names = "default";
+-	pinctrl-0 = <&uart2_ph_pins>;
+-};
+ 
+-&uart5 {
+-	status = "disabled";
+-	pinctrl-names = "default";
+-	pinctrl-0 = <&uart5_pins>;
+-};
+ 
+ &usbotg {
+ 	status = "okay";

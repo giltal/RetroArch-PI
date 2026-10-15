@@ -24,12 +24,14 @@ verified to apply cleanly, in that order, to a pristine linux-6.18.53.
 | 0043 | `patches.armbian/0701-…-enable-sound` | H616 AHUB audio driver (`sound/soc/sunxi_v2`), which carries **HDMI audio** |
 | 0044 | `patches.armbian/0702-…-add-digital-audio-node` | HDMI audio clocking fix. Without it the PCM runs but no sound comes out |
 | 0045 | `…-increase-bl31-reserved-memory` | 512K reserved for BL31, which TF-A lts-v2.12 needs |
-| 0046 | `…-zero2w-zero3-cpu-dvfs.dtsi` | CPU OPPs and regulator, so cpufreq works |
-| 0047 | `…-orangepi-zero3-enable-gpu-mali` | `&gpu { status = "okay"; }` for panfrost |
+| 0046 | `…-zero2w-zero3-cpu-dvfs.dtsi` | CPU OPPs and regulator, so cpufreq works. **Zero3 DTS only: in `board/opi-zero3/patches/linux/`** |
+| 0047 | `…-orangepi-zero3-enable-gpu-mali` | `&gpu { status = "okay"; }` for panfrost. **Zero3 DTS only: in `board/opi-zero3/patches/linux/`** |
 | 0048 | `drv-nvmem-sunxi-add-h616-support` | SID/efuse, used for the CPU speed bin and thermal calibration |
 | 0049 | `drv-soc-sunxi-sram-add-h616-sram-c1` | SRAM C1 claim for the video engine |
 
-Our own, on top of Armbian's set:
+Our own, on top of Armbian's set (0050 and 0051 patch the Zero3 DTS and live in
+`board/opi-zero3/patches/linux/`; the K2B's own DT patches are in
+`board/kickpi-k2b/patches/linux/`, see the README there):
 
 | Ours | What for |
 |---|---|

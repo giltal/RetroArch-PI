@@ -1,0 +1,77 @@
+From: K2B_RetroArch
+Subject: [PATCH] sunxi: kickpi-k2b: DDR3, not LPDDR4
+
+The K2B this image targets carries two Samsung K4B4G0846E-BYK0: DDR3(L)
+4 Gbit x8, i.e. a 16-bit bus and 1 GB. Patch 0001 (Armbian's) configures
+LPDDR4 @ 792 MHz, which cannot train DDR3; SPL stops at DRAM init (as in
+the Armbian forum report of "dram setup not supported" on this board).
+
+This board is the K2B V2.2 (DDR3). DRAM parameters match Armbian's
+kickpi_k2b_v2_defconfig (armbian/build PR #10902, cross-checked there
+against the vendor SPL): transpeed-8k618-t's DDR3 @ 648 MHz values plus
+ODT_EN=0x0 and TPR1=0x30fb. dcdc3 goes to 1.5 V, as there: in spec for
+DDR3L (dual-voltage) and plain DDR3, and what the board DTS's vdd-dram
+regulator says, so Linux keeps it unchanged.
+
+No eMMC: it is optional on the K2B, not fitted on this board, and not
+supported by this image. MMC_SUNXI_SLOT_EXTRA and SUPPORT_EMMC_BOOT are
+dropped and mmc2 is disabled in the U-Boot DTS.
+
+---
+--- a/configs/kickpi_k2b_defconfig
++++ b/configs/kickpi_k2b_defconfig
+@@ -2,18 +2,19 @@
+ CONFIG_ARCH_SUNXI=y
+ CONFIG_DEFAULT_DEVICE_TREE="allwinner/sun50i-h618-kickpi-k2b"
+ CONFIG_SPL=y
+-CONFIG_DRAM_SUNXI_DX_ODT=0x07070707
++CONFIG_DRAM_SUNXI_DX_ODT=0x03030303
+ CONFIG_DRAM_SUNXI_DX_DRI=0x0e0e0e0e
+-CONFIG_DRAM_SUNXI_CA_DRI=0x0e0e
+-CONFIG_DRAM_SUNXI_ODT_EN=0xaaaaeeee
+-CONFIG_DRAM_SUNXI_TPR6=0x48808080
+-CONFIG_DRAM_SUNXI_TPR10=0x402f6663
+-CONFIG_DRAM_SUNXI_TPR11=0x26262524
+-CONFIG_DRAM_SUNXI_TPR12=0x100f100f
++CONFIG_DRAM_SUNXI_CA_DRI=0x1f12
++CONFIG_DRAM_SUNXI_ODT_EN=0x0
++CONFIG_DRAM_SUNXI_TPR0=0xc0001002
++CONFIG_DRAM_SUNXI_TPR1=0x30fb
++CONFIG_DRAM_SUNXI_TPR6=0x33808080
++CONFIG_DRAM_SUNXI_TPR10=0x2f1107
++CONFIG_DRAM_SUNXI_TPR11=0xddddcccc
++CONFIG_DRAM_SUNXI_TPR12=0xeddc7665
+ CONFIG_MACH_SUN50I_H616=y
+-CONFIG_SUNXI_DRAM_H616_LPDDR4=y
+-CONFIG_DRAM_CLK=792
+-CONFIG_MMC_SUNXI_SLOT_EXTRA=2
++CONFIG_SUNXI_DRAM_H616_DDR3_1333=y
++CONFIG_DRAM_CLK=648
+ CONFIG_R_I2C_ENABLE=y
+ # CONFIG_SYS_MALLOC_CLEAR_ON_INIT is not set
+ CONFIG_CMD_KASLRSEED=y
+@@ -23,9 +24,8 @@
+ CONFIG_SYS_I2C_SLAVE=0x7f
+ CONFIG_SYS_I2C_SPEED=400000
+ CONFIG_SUN8I_EMAC=y
+-CONFIG_SUPPORT_EMMC_BOOT=y
+ CONFIG_AXP313_POWER=y
+-CONFIG_AXP_DCDC3_VOLT=1360
++CONFIG_AXP_DCDC3_VOLT=1500
+ CONFIG_DM_RNG=y
+ CONFIG_USB_EHCI_HCD=y
+ CONFIG_USB_OHCI_HCD=y
+--- a/dts/upstream/src/arm64/allwinner/sun50i-h618-kickpi-k2b.dts
++++ b/dts/upstream/src/arm64/allwinner/sun50i-h618-kickpi-k2b.dts
+@@ -156,9 +156,9 @@
+ 	};
+ };
+ 
+-/* eMMC */
++/* eMMC: not fitted, not supported */
+ &mmc2 {
+-	status = "okay";
++	status = "disabled";
+ 	bus-width = <8>;
+ 	cap-mmc-hw-reset;
+ 	mmc-hs200-1_8v;

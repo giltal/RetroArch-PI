@@ -1,0 +1,23 @@
+From: K2B_RetroArch
+Subject: [PATCH] arm64: dts: kickpi-k2b: disable the eMMC slot
+
+The eMMC is optional on the K2B and not fitted on the board this image
+targets: every boot logged "mmc2: Failed to initialize a non-removable
+card" 15 ms after the controller came up (nothing answers CMD0). The
+image boots and runs from microSD only; eMMC is not supported.
+
+---
+--- a/arch/arm64/boot/dts/allwinner/sun50i-h618-kickpi-k2b.dts
++++ b/arch/arm64/boot/dts/allwinner/sun50i-h618-kickpi-k2b.dts
+@@ -253,9 +253,9 @@
+ 	};
+ };
+ 
+-/* eMMC */
++/* eMMC: not fitted on the K2B this image targets, and not supported (0065) */
+ &mmc2 {
+-	status = "okay";
++	status = "disabled";
+ 	bus-width = <8>;
+ 	cap-mmc-hw-reset;
+ 	mmc-hs200-1_8v;

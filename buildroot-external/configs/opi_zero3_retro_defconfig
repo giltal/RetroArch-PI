@@ -1,4 +1,4 @@
-# RetroOPI_Z3 — Orange Pi Zero3 (Allwinner H618, 4x Cortex-A53, Mali-G31 MP2, 2 GB)
+# RetroArch-PI -- Orange Pi Zero3 (Allwinner H618, 4x Cortex-A53, Mali-G31 MP2, 2 GB)
 #
 # Port of RetroBPI_M2M (C:\BananaPi_Projects\RetroBPI_M2M). The userspace --
 # launcher, RetroArch, cores, init scripts, DS3 Bluetooth -- is carried over.
@@ -23,7 +23,7 @@ BR2_PACKAGE_HOST_LINUX_HEADERS_CUSTOM_6_18=y
 
 # --- System -------------------------------------------------------------
 BR2_TARGET_GENERIC_HOSTNAME="retroopi"
-BR2_TARGET_GENERIC_ISSUE="RetroOPI_Z3"
+BR2_TARGET_GENERIC_ISSUE="RetroArch-PI (Orange Pi Zero3)"
 # The debug UART is UART0 on the board's 3-pin debug header (GND / RX / TX,
 # 3.3 V, 115200 8N1). Mainline names it ttyS0.
 BR2_TARGET_GENERIC_GETTY_PORT="ttyS0"
