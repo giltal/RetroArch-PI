@@ -134,6 +134,9 @@ WARN rather than PASS in the sweep), Super Mario 64 still on the dynarec at 100%
 
 ### Orange Pi Zero3
 
-| Date / commit | Game | Verdict | Speed mean (min) | Temp |
-|---|---|---|---|---|
-| (not yet run from this tree) | | | | |
+**2026-10-16, `27f344b` (first build from this tree; U-Boot still the old one):**
+12 PASS, 1 WARN, 1 SKIP, 0 FAIL, 44–48 °C. PSX CTR / GT2* 100%; N64 Mario 64 / Mario Kart 100%,
+GoldenEye WARN (runs on the cached interpreter, no audio in its window); PSP Burnout 101.0%,
+AC Bloodlines 100.6%, Gran Turismo 100.7%; Dreamcast SA2 / Crazy Taxi 2 / MSR 100.0% (threaded
+audio, as played); Metal Slug 101.4%, 1944 100.3%. Resident 2: SKIP (not on this card).
+\* Same .cue file-name problem as on the K2B's card.

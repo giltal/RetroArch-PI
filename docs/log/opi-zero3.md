@@ -1250,3 +1250,31 @@ The user's call: the Mali-G31 handles parallel-n64 at 640x480 easily, so the Set
 survives in an incremental target/. The shipped `ParaLLEl N64.opt` already had
 `parallel-n64-screensize = "640x480"`; its comment now says it is fixed, and the board's copy
 was confirmed at 640x480. RetroArch's own core options can still change it per game.
+
+---
+
+## 2026-10-16 — First build from the RetroArch-PI tree, updated over SSH, release sweep
+
+- **Build** (`build.sh zero3`, fresh `~/zero3`): OK in 116 min.
+  - 0 defconfig lines lost.
+  - Kernel `.config`, DTB and U-Boot `.config` are **identical** to the old `~/opi` build.
+  - Images: `firmware/zero3/`.
+- **Board updated over SSH** (night run, unattended):
+  - 87 rootfs files replaced by rename (13 new), 0 failed. Left alone: `/root/.config`,
+    passwd/group/shadow and the ROM card.
+  - `board.sh zero3 kernel`: kernel md5 matches on host and board.
+  - **U-Boot not updated** (no one awake to recover a failed write). The `kernel_addr_r` boot
+    gain comes with the next U-Boot write.
+- **After the reboot:**
+  - `RetroArch-PI (Orange Pi Zero3)`, init 1.31 s, link 1 Gbps, exFAT ROM card mounted,
+    launcher ready 737 ms.
+  - CPU up to 1512 MHz, GPU 432/600 MHz.
+  - `driver_async_probe=ehci-platform,ohci-platform` active.
+- **Release sweep: 12 PASS, 1 WARN, 1 SKIP, 0 FAIL.**
+  - GoldenEye now stays up (parallel-n64 0004); WARN only because there was no audio in its
+    window.
+  - Dreamcast, run as played (threaded audio), at 100%.
+  - Resident 2 is not on this card.
+  - 44–48 °C.
+- `volumed` has no input device open: there's no power key on the Zero3 and no pad was
+  connected. As before.
