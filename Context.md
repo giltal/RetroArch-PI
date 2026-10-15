@@ -18,7 +18,7 @@ Per-board history: `docs/log/<board>.md`. Shared work from the merge on: `Develo
 | HDMI | micro | full-size |
 | Power button | none (power off from the launcher) | GPIO PC2: clean shutdown; cannot power on |
 | eMMC | none | optional; not fitted on ours; not supported |
-| CPU/GPU clocks | 1512 MHz CPU, 600 MHz GPU (patches 0050/0051) | stock tables so far; port of 0050/0051 still to do |
+| CPU/GPU clocks | 1512 MHz CPU, 600 MHz GPU (patches 0050/0051) | same, patch 0066 (peak 78 °C in the stress test, no heatsink) |
 
 ## Layers
 
@@ -32,9 +32,9 @@ fragments. See BUILDING.md, "How the boards share the tree".
 
 ## Plan
 
-1. **K2B:** DS3 over a USB Bluetooth dongle; port 0050/0051 (GPU OPPs, CPU cooling + 1512 MHz)
-   as K2B patches and re-verify with the 10-minute stress test and temperatures; optional
-   "soft off" so the power button can also power on.
+1. **K2B:** DS3 over a USB Bluetooth dongle; optional "soft off" so the power button can also
+   power on; a heatsink (the 1512 MHz stress test peaked at 78 °C, just under the 80 °C trip).
+   Done: clocks ported as 0066 (1512 MHz CPU, 600 MHz GPU), stress-tested.
 2. **Zero3:** rebuild from this tree and re-verify on the board. It now gets the shared fixes
    from the K2B port: exFAT ROM partition (built empty, folders created on first boot), the CRLF
    core patches, `/opt/roms`, the LZ4 kernel on a fresh tree, and U-Boot's 2 MiB-aligned
