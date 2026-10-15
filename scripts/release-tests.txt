@@ -1,0 +1,34 @@
+# Release smoke test: a few games per heavy emulator (docs/test-plan.md).
+#
+# system|core|rom (relative to /opt/roms/<system>; a folder means its .gdi/.cue/.m3u)|settle s|measure s|env
+#
+# settle: wait before measuring (load, intro). measure: window for the audio
+# speed meter (RetroArch patch 0007, "[Audio]: Speed: N%" every ~5 s).
+# Missing ROMs are reported as SKIP, so the list can name games another card lacks.
+
+# PlayStation (pcsx_rearmed)
+psx|pcsx_rearmed_libretro.so|CTR - Crash Team Racing.cue|40|30|
+psx|pcsx_rearmed_libretro.so|Gran Turismo 2.cue|40|30|
+psx|pcsx_rearmed_libretro.so|Resident 2.PBP|40|30|
+
+# Nintendo 64 (parallel-n64)
+n64|paralleln64_libretro.so|Super Mario 64 (USA).z64|40|30|
+n64|paralleln64_libretro.so|Mario Kart 64 (USA).z64|40|30|
+n64|paralleln64_libretro.so|GoldenEye 007 (USA).z64|40|30|
+
+# PSP (PPSSPP)
+psp|ppsspp_libretro.so|Burnout Legends (USA) (En,Fr,De,Es,It,Nl) (v2.00).iso|50|30|
+psp|ppsspp_libretro.so|psy-acb.iso|50|30|
+psp|ppsspp_libretro.so|Gran Turismo (USA) (En,Fr,Es) (v2.00).iso|50|30|
+
+# Dreamcast (Flycast), as played: threaded audio on (Flycast patch 0007). The
+# meter then reads the audio output (~100% when the sound is smooth), not the
+# emulation speed; for that, run scripts/benchmark-tests.txt. GD-ROM images
+# load slowly from a cold card, hence the long settle.
+dreamcast|flycast_libretro.so|Sonic Adventure 2|90|30|
+dreamcast|flycast_libretro.so|Crazy Taxi 2 (USA).chd|50|30|
+dreamcast|flycast_libretro.so|MSR - Metropolis Street Racer (USA) (Rev A).chd|90|30|
+
+# Arcade
+neogeo|fbalpha2012_libretro.so|mslug.zip|30|20|
+mame|mame2003plus_libretro.so|1944.zip|30|20|

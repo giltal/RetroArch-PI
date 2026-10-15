@@ -14,6 +14,7 @@ MAE0621A PHY); Armbian's `kickpi-k2b` DTS and U-Boot describe the V1.
 | 0063 | Adds `mmc0`/`mmc1` aliases. SD and SDIO are both enabled, so this keeps the SD card at `mmcblk0` (`root=` and the `/opt/roms` mount rely on it). |
 | 0064 | Holds the MAE0621A out of reset from early boot: PI6 is a `gpio-hog` (output high) in `&pio`, and the PHY node's `reset-gpios` is removed. The PHY must answer its ID read for its driver (0062) to bind. With a PHY-node reset, PI6 is still low at the read (our U-Boot leaves it low). With a bus-level reset (tried), the scan runs 100 ms after the pulse and the PHY doesn't answer yet either. Both ended in "EMAC reset timeout". Verified on the board: Maxio probe at 0.93 s, link 1 Gbps at 6.2 s, 1472-byte pings with 0% loss. |
 | 0065 | Disables `&mmc2` (eMMC). It is optional on the K2B, not fitted on our board, and not supported. Every boot logged "mmc2: Failed to initialize a non-removable card". |
+| 0066 | Port of the Zero3's 0050 and 0051: GPU OPP table (432 MHz @ 900 mV, 600 MHz @ 960 mV) with devfreq; CPU cooling map on the passive trip, trips raised to 80/90 °C; 1512 MHz for speed grades 0/2 at the 1.10 V that 1416 MHz already uses. Same SoC, rails (dcdc1 810–990 mV, dcdc2 810–1100 mV) and speed grade as the Zero3. Verified with `scripts/cpu-stress.sh` (see `docs/log/kickpi-k2b.md`). |
 
 ## uboot/
 

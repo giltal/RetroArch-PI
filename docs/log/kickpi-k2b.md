@@ -527,3 +527,43 @@ Over the day the launcher start went **5.64 → 5.13 s** from the SPL banner.
 - Also applied to the **Zero3**'s extlinux.conf (same H616 USB block, same race possible).
   Untested on Zero3 hardware.
 - The async-probe `__request_module` WARNING is still open (see above).
+
+### Release test plan, first sweep, clock port
+
+**Test tooling** (`docs/test-plan.md`):
+- `scripts/release-test.sh <board>` runs `scripts/release-tests.txt`: 3 games per heavy system
+  plus Neo Geo and MAME, launched over SSH as the launcher would. It reads the audio speed
+  meter (RetroArch 0007) and gives PASS/WARN/FAIL/SKIP.
+- `scripts/cpu-stress.sh` is the Zero3's self-checking md5+sha256 stress test as a script
+  (`ref` / `run N`).
+
+**Stock-clock sweep:** 11 PASS at 100–101%, GoldenEye FAIL, SA2/MSR WARN (no samples).
+- **GoldenEye:** exits after 2 s, status 133 (SIGTRAP), right after parallel-n64's
+  `Init new dynarec`. Open.
+- **Gran Turismo 2:** the card's .cue names a .bin that is not there. A card issue, reported
+  to the user.
+
+**Patch 0066 = the Zero3's 0050 + 0051 on the K2B DTS.** Same rails and speed grade; 1416 MHz
+was the top of the table.
+- On the board:
+  - CPU offers 1512 MHz, vdd-cpu stays at 1100 mV.
+  - GPU devfreq 432/600 MHz, simple_ondemand.
+  - Cooling devices cpufreq-cpu0 and devfreq-gpu.
+- **Stress test at 1512 MHz:** 10 min, 1,443 rounds, 0 mismatches, 1512 MHz in all 20 samples,
+  **peak 78 °C** and still creeping up (Zero3: 60 °C).
+  - The K2B has no heatsink. Under long all-core load it would reach the 80 °C passive trip and
+    throttle, which is the design. Games ran 55–64 °C.
+- **Sweep at the new clocks:** same verdicts; no visible gain at title screens/attract demos.
+
+**Choppy-sound scare.**
+- The user heard choppy Dreamcast sound and took it for a regression of the Zero3's
+  threaded-audio fix (Flycast 0007).
+- The cause was the test: the sweep ran Flycast with `FLYCAST_THREADED_AUDIO=0` (lockstep, for
+  the speed meter). A timeline debug run cancelled on the PC had still started on the board,
+  and kept playing SA2 that way.
+- The board's `Flycast.opt` has `reicast_threaded_audio = "enabled"`, identical to the build.
+- **Changes:**
+  - The sweep now runs Dreamcast as played (threaded audio on).
+  - The lockstep speed measurement moved to `scripts/benchmark-tests.txt`. It runs on request
+    only, and `release-test.sh` warns that the sound will be choppy.
+  - `release-test.sh` now traps interrupts, stops the board-side run and restarts the launcher.

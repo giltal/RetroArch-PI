@@ -1,0 +1,15 @@
+# Dreamcast speed benchmark: run ONLY on request (docs/test-plan.md, part 3).
+#
+#   wsl bash /mnt/c/RetroArch_PI/scripts/release-test.sh <board> /mnt/c/RetroArch_PI/scripts/benchmark-tests.txt
+#
+# FLYCAST_THREADED_AUDIO=0 forces Flycast's lockstep AICA (Flycast patch 0008),
+# so the audio speed meter reads the EMULATION speed. The sound on the TV is
+# choppy by design during this run (the AICA runs at the SH4's speed): it is
+# not what the player hears. release-test.sh warns before starting.
+#
+# Same format as release-tests.txt: system|core|rom|settle s|measure s|env
+# Sonic Adventure 2's attract demo starts ~30 s in: the reference benchmark.
+
+dreamcast|flycast_libretro.so|Sonic Adventure 2|90|60|FLYCAST_THREADED_AUDIO=0
+dreamcast|flycast_libretro.so|Crazy Taxi 2 (USA).chd|60|60|FLYCAST_THREADED_AUDIO=0
+dreamcast|flycast_libretro.so|MSR - Metropolis Street Racer (USA) (Rev A).chd|90|60|FLYCAST_THREADED_AUDIO=0
