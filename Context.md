@@ -35,10 +35,10 @@ fragments. See BUILDING.md, "How the boards share the tree".
 1. **K2B:** DS3 over a USB Bluetooth dongle; optional "soft off" so the power button can also
    power on; a heatsink (the 1512 MHz stress test peaked at 78 °C, just under the 80 °C trip).
    Done: clocks ported as 0066 (1512 MHz CPU, 600 MHz GPU), stress-tested.
-2. **Zero3:** rebuild from this tree and re-verify on the board. It now gets the shared fixes
-   from the K2B port: exFAT ROM partition (built empty, folders created on first boot), the CRLF
-   core patches, `/opt/roms`, the LZ4 kernel on a fresh tree, and U-Boot's 2 MiB-aligned
-   `kernel_addr_r` (0.3 s faster boot).
+2. ~~**Zero3:** rebuild from this tree and re-verify on the board.~~ Done 2026-10-16: kernel,
+   U-Boot and rootfs from this tree, release sweep 12 PASS / 0 FAIL, init 0.88 s. Still open
+   there: mupen64plus-next, hardware PSX renderers, PicoDrive, onboard Wi-Fi/BT
+   (`docs/boards/opi-zero3.md`).
 3. **Raspberry Pi 4:** a new family layer (`board/bcm2711`): Raspberry Pi firmware boot instead
    of U-Boot, its kernel, Mesa V3D instead of panfrost. The shared layers should need no change
    beyond what the GPU driver choice forces (Mesa options, RetroArch video settings).
