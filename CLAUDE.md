@@ -12,9 +12,10 @@ on mainline Linux 6.18.53. **One tree, several boards:**
 | KickPi K2B V2.2 (`k2b`) | Allwinner H618, Mali-G31 MP2, 2 GB DDR3 | Maxio MAE0621A PHY; V1 not supported; no eMMC |
 | Raspberry Pi 4 | BCM2711, V3D | Planned: its own family layer next to `board/h616` |
 
-History: a port of RetroBPI_M2M (Banana Pi M2 Magic). The K2B was first ported in its own tree
-(`C:\KickPI_Projects\K2B_RetroArch`) and merged here; that folder and
-`C:\OrangePI_Projects\RetroOPI_Z3` are **superseded** and kept only as a fallback.
+History: a port of RetroBPI_M2M (Banana Pi M2 Magic). The Zero3 tree (RetroOPI_Z3) became this
+repo; the K2B was first ported in its own tree and merged here. Both old folders are
+**superseded** and archived on the backup SSD (`H:\OrangePI_Projects\RetroOPI_Z3`,
+`H:\KickPI_Projects\K2B_RetroArch`, verified by MD5). Read them if needed; never work in them.
 
 - **Read `Context.md` first**, then the board's notes in `docs/boards/<board>.md`.
 - **Read the last entry of `DevelopmentLog.md`** (shared work) and of the board's log in
