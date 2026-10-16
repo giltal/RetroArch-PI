@@ -45,7 +45,12 @@ fragments. See BUILDING.md, "How the boards share the tree".
 4. ~~**N64: GoldenEye 007 and Perfect Dark on the dynamic recompiler.**~~ Done 2026-10-16:
    the SIGTRAP was a stray `brk 0` in the ARM64 `fp_exception_ds`, not TLB handling.
    parallel-n64 0004 now removes it (the cached-interpreter workaround is gone). Both games run on
-   the dynarec at 97–100%. Verified on the Zero3; the K2B still runs the old core until its next
-   push. Details: `docs/log/opi-zero3.md`.
-5. **N64: Conker's Bad Fur Day segfaults** on the dynarec about 25 s in (SIGSEGV, level 0
-   translation fault). The cause predates the 0004 change: the old core does the same.
+   the dynarec at 97–100%. Verified on the Zero3; on the K2B since 2026-10-16 (with 0005).
+   Details: `docs/log/opi-zero3.md`.
+5. ~~**N64: Conker's Bad Fur Day segfaults** on the dynarec about 25 s in.~~ Fixed 2026-10-16:
+   `emit_andimm64` encoded its immediate inside an `assert()`, which `-DNDEBUG` compiles out, so
+   SDL/SDR stored through a garbage-masked address. parallel-n64 0005 moves the encoding out of the
+   `assert`. Conker alive past 75 s at ~100%; GoldenEye, Perfect Dark and Super Mario 64 still
+   fine. Tested on the K2B (the Zero3 was off); installed and re-checked on
+   both boards.
+   Details: `docs/log/opi-zero3.md`.

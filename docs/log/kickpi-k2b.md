@@ -588,3 +588,19 @@ was the top of the table.
   - GoldenEye 87.6–100.2% and Perfect Dark 84.6–99.1%, both on the cached interpreter.
   - Super Mario 64 still on the dynarec at 100.2%.
   - Gameplay speed still to be judged by the user.
+
+---
+
+## 2026-10-16 — parallel-n64 0004 + 0005 on the K2B (N64 dynarec fixes)
+
+- The cartridge-ID workaround above is gone. The real causes were found and fixed for both
+  boards (details in `docs/log/opi-zero3.md`):
+  - **0004:** a stray `brk 0` in `fp_exception_ds` (GoldenEye, Perfect Dark).
+  - **0005:** `emit_andimm64` encoded its immediate inside an `assert()`, which `-DNDEBUG`
+    compiles out, so SDL/SDR stored through a garbage address (Conker, SIGSEGV after ~25 s).
+    The earlier "Conker runs at ~99–100%" came from runs shorter than that.
+- Diagnosed and tested on this board while the Zero3 was off, with the Zero3-built core run from
+  `/tmp`: Conker 75 s, GoldenEye, Perfect Dark and Super Mario 64 40 s each, all alive at ~100%.
+- **Installed:** `~/k2b` rebuilt parallel-n64 (dirclean, 0001–0005 applied) and
+  `board.sh k2b push` sent it (md5 `dabcb7ae…`, verified on the board). Conker on the installed
+  core: alive after 75 s, 100.0–100.3%. The launcher is running and `exception-trace` is back to 0.

@@ -1,0 +1,32 @@
+From: RetroArch-PI
+Subject: [PATCH] new_dynarec arm64: encode the emit_andimm64 immediate outside assert()
+
+emit_andimm64 called genimm(), which encodes the logical immediate into
+armval, inside an assert(). The core is built with -DNDEBUG, so the call
+was compiled out and the AND got whatever was left in armval on the
+stack.
+
+The only users are SDL and SDR, which clear the low address bits with
+emit_andimm64(temp, ~3, temp) before writing the second word. The
+garbage immediate turned that into, for example,
+"and x1, x1, #0x100000001", and the following store went to 0x100000004:
+SIGSEGV ("level 0 translation fault"). Conker's Bad Fur Day (USA) dies
+this way 23-28 s in, at 100% speed until then.
+
+Call genimm() first and assert on its result, as emit_testimm64 does.
+
+---
+--- a/mupen64plus-core/src/r4300/new_dynarec/arm64/assem_arm64.c
++++ b/mupen64plus-core/src/r4300/new_dynarec/arm64/assem_arm64.c
+@@ -1902,8 +1902,9 @@
+ {
+   assert(rs!=29);
+   assert(rt!=29);
+-  u_int armval;
+-  assert(genimm((uint64_t)imm,64,&armval));
++  u_int armval, ret;
++  ret=genimm((uint64_t)imm,64,&armval);
++  assert(ret);
+   assem_debug("and %s,%s,#%d",regname64[rt],regname64[rs],imm);
+   output_w32(0x92000000|armval<<10|rs<<5|rt);
+ }

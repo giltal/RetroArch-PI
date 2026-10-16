@@ -1324,3 +1324,45 @@ code. Wrong guess.
   dynarec at ~99–100%" came from a shorter run. Open.
 - Left open in the ARM64 port: the other `brk` placeholders. Nothing seen has hit them.
 - **The K2B** still runs the old core (the cached-interpreter workaround) until its next push.
+
+### Conker's Bad Fur Day on the dynarec: SDL/SDR with a garbage AND (parallel-n64 0005)
+
+Conker played at 100% for 23–28 s, then SIGSEGV (status 139): `DABT (lower EL), ESR 0x92000044,
+level 0 translation fault`, `lr` 0. The Zero3 was off, so this was **tested on the K2B** (same
+H618 and the same binary: the cores were built in `~/zero3` and run from the K2B's `/tmp`).
+- **Reproduced** with the Zero3's installed core (`6ea15b3d…`): dead after 28 s.
+  - `/proc/<pid>/maps` puts the pc inside the core's BSS, which is `extra_memory`, the dyncache.
+    So the fault is in generated code, not in a `brk` placeholder.
+  - ESR has WnR set, so it's a **store**. x8/x11 held N64 addresses (`ffffffff80030fc6`).
+- **Diagnostic core:** a SIGSEGV handler in `new_dynarec_init` writes pc, fault address, the
+  registers, the nearest block entry (from `jump_in`/`jump_dirty`) and 288 words of code around
+  the pc to `/tmp/pn64-segv.txt`. Disassembled on the host with `objdump -b binary -m aarch64`.
+  - Fault address `0x100000004`, in the tail of an **SDL** (store doubleword left, here of `$zero`)
+    in a TLB-mapped block (`using_tlb` 1):
+    `tst x1,#4; b.ne …; and x1, x1, #0x100000001; stur w27, [x1,#4]`.
+  - The `and` should be `#~3`.
+- **The bug:** `emit_andimm64` encodes its immediate with `assert(genimm(imm, 64, &armval))`.
+  The core is built with `-DNDEBUG`, so the whole call is compiled out and `armval` is stack
+  garbage. Its only users are SDL and SDR (`emit_andimm64(temp, ~3, temp)` before the second
+  word), so only games that use those instructions are hit. No other `assert` in the ARM64
+  assembler or `new_dynarec_64.c` has a side effect. `emit_testimm64` already does it right
+  (`ret = genimm(...); assert(ret);`).
+- **New `libretro-paralleln64/0005`** does the same in `emit_andimm64`. Clean
+  `libretro-paralleln64-dirclean` build: 0001–0005 apply, no diagnostic edits left. Core md5
+  `1f1278ca…`.
+- **Checked on the K2B from `/tmp`** (its installed core was not touched):
+
+| Game | Result | Speed |
+|---|---|---|
+| Conker's Bad Fur Day | alive after **75 s**, Dynamic Recompiler | 99.8–101.1% |
+| GoldenEye 007 | alive after 40 s | 98.4–100.2% |
+| Perfect Dark | alive after 40 s | 91.9–100.2% (first window loading) |
+| Super Mario 64 | alive after 40 s | 93.8–100.2% |
+
+- `debug.exception-trace` is back to 0, the test files are removed from `/tmp`, and the launcher
+  is running.
+- **Installed on the K2B** (its own `~/k2b` build, pushed and checked: see `docs/log/kickpi-k2b.md`).
+- **Installed on the Zero3** (`board.sh zero3 push`, md5 `1f1278ca…`, the same build tested above).
+  Conker on the installed core: alive after 75 s, 99.4–101.2%. The launcher is running and
+  `exception-trace` is back to 0.
+- I skipped the `cached_interpreter` comparison: the dump showed the cause directly.
