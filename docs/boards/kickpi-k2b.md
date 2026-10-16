@@ -27,7 +27,7 @@ Verified on our board unless noted. Sources: Armbian's device tree
 | Storage | microSD only (mmc0, card detect PF6). eMMC (mmc2) is optional on the K2B, **not fitted on ours, and not supported**: disabled in the kernel DT (0065) and U-Boot (`uboot/0002`) | same |
 | USB | EHCI/OHCI 0–2, OTG as peripheral | similar |
 | Buttons/LEDs | **Inner button = power key** on PC2 (gpio-keys-polled, KEY_POWER): volumed does a clean shutdown. It **cannot power on** (a GPIO, not the PMIC's PWRON); power-on is by replugging. The outer button doesn't power on either (reset or FEL?). Blue status LED on PI16, IR receiver (unused) | Zero3 has no power key |
-| Cooling | **No heatsink.** The 10-minute stress test at 1512 MHz peaked at **78 °C**, still creeping up, just under the 80 °C passive trip. Games run 55–64 °C | Zero3: 60 °C |
+| Cooling | **Heatsink fitted** (earlier notes said none; corrected by the user 2026-10-16). With it, the 10-minute stress test at 1512 MHz peaked at **78 °C**, still creeping up, just under the 80 °C passive trip. Games run 55–64 °C. **A fan is to be added** | Zero3: 60 °C |
 | Debug UART | UART0 on PH pins, 115200 8N1, 3.3 V. COM8 on this PC (`scripts/serial.ps1`) | same |
 
 ## Board layer (`board/kickpi-k2b/`)
@@ -55,7 +55,9 @@ clocks: same verdicts as at stock clocks.
 ## Open
 
 1. **DS3 over a USB Bluetooth dongle.**
-2. **Heatsink**, so long all-core loads stay clear of the 80 °C trip.
+2. **Fan** (the heatsink alone reached 78 °C). Once it is fitted, re-run the 10-minute stress
+   test (`scripts/cpu-stress.sh`). If the fan is GPIO- or PWM-controlled rather than always on,
+   it needs a DT node (`gpio-fan`/`pwm-fan`) bound to the CPU thermal zone.
 3. Optional **"soft off"**: the power key syncs and reboots into a U-Boot that blanks HDMI and
    polls PC2, then boots on a press. On/off from the button, at the cost of idle power while
    "off". The user's call.

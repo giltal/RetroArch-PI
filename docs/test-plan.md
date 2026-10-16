@@ -93,8 +93,9 @@ Record one line per game per release. Speed is the meter mean over the window.
 From patch 0066 on, the K2B runs the Zero3's clocks: CPU 1512 MHz, GPU 432/600 MHz
 with devfreq. `scripts/cpu-stress.sh` at 1512 MHz: 0 mismatches in 1,443 rounds,
 100% at 1512 MHz, peak 78 °C after 10 minutes of all-core load (Zero3: 60 °C). The
-K2B has no heatsink and runs close to the 80 °C passive trip under sustained full
-load, so a long all-core load would throttle.
+K2B runs close to the 80 °C passive trip under sustained full load, so a long all-core
+load would throttle. (This was with the heatsink fitted; the note first said there was
+none. A fan is to be added, then the stress test re-run.)
 
 **2026-10-15, `493287f` + 0066 work in progress, stock clocks (CPU 1416 MHz, GPU fixed 432 MHz):**
 

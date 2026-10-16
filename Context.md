@@ -18,7 +18,7 @@ Per-board history: `docs/log/<board>.md`. Shared work from the merge on: `Develo
 | HDMI | micro | full-size |
 | Power button | none (power off from the launcher) | GPIO PC2: clean shutdown; cannot power on |
 | eMMC | none | optional; not fitted on ours; not supported |
-| CPU/GPU clocks | 1512 MHz CPU, 600 MHz GPU (patches 0050/0051) | same, patch 0066 (peak 78 °C in the stress test, no heatsink) |
+| CPU/GPU clocks | 1512 MHz CPU, 600 MHz GPU (patches 0050/0051) | same, patch 0066 (peak 78 °C in the stress test with the heatsink; fan to be added) |
 
 ## Layers
 
@@ -33,7 +33,8 @@ fragments. See BUILDING.md, "How the boards share the tree".
 ## Plan
 
 1. **K2B:** DS3 over a USB Bluetooth dongle; optional "soft off" so the power button can also
-   power on; a heatsink (the 1512 MHz stress test peaked at 78 °C, just under the 80 °C trip).
+   power on; a fan (with the heatsink, the 1512 MHz stress test peaked at 78 °C, just under the
+   80 °C trip), then re-run the stress test.
    Done: clocks ported as 0066 (1512 MHz CPU, 600 MHz GPU), stress-tested.
 2. ~~**Zero3:** rebuild from this tree and re-verify on the board.~~ Done 2026-10-16: kernel,
    U-Boot and rootfs from this tree, release sweep 12 PASS / 0 FAIL, init 0.88 s. Still open
