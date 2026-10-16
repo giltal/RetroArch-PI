@@ -1,0 +1,25 @@
+From: RetroArch-PI
+Subject: [PATCH] new_dynarec arm64: remove the stray brk from fp_exception_ds
+
+fp_exception_ds raises the Coprocessor Unusable exception for an FPU
+instruction in a branch delay slot while Status.CU1 is clear. The ARM64
+port starts it with a "brk 0" left in front of a complete body, which is
+the same as the 32-bit ARM one (linkage_arm.S). Any game that does lazy
+FPU switching with an FPU op in a delay slot dies with SIGTRAP: GoldenEye
+007 and Perfect Dark, about 2 s after "Init new dynarec".
+
+Without the brk both run on the dynarec at 97-100% (Orange Pi Zero3, H618
+@ 1512 MHz). Replaces the earlier workaround that ran these two games on
+the cached interpreter.
+
+---
+--- a/mupen64plus-core/src/r4300/new_dynarec/arm64/linkage_aarch64.S
++++ b/mupen64plus-core/src/r4300/new_dynarec/arm64/linkage_aarch64.S
+@@ -448,7 +448,6 @@
+     br     x0
+     
+ GLOBAL_FUNCTION(fp_exception_ds):
+-    brk    0
+     mov    w2, #0x90000000 /* Set high bit if delay slot */
+     b      .F1
+     

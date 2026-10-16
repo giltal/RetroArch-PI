@@ -1285,3 +1285,42 @@ was confirmed at 640x480. RetroArch's own core options can still change it per g
   - Write verified by reading back (`f8711b14…`).
   - Reboot: init 0.88 s, link 1 Gbps, ROM card and launcher OK.
   - The Zero3 now runs this tree's complete build.
+
+### GoldenEye 007 and Perfect Dark on the dynarec: the real fix (parallel-n64 0004)
+
+The K2B's 0004 ran these two games on the cached interpreter because they crashed the ARM64
+new_dynarec (SIGTRAP, status 133, ~2 s after `Init new dynarec`). That log blamed TLB-mapped
+code. Wrong guess.
+
+- **Reading the ARM64 port first:** it still has several `brk 0` placeholders:
+  - `dyna_linker`/`dyna_linker_ds` and `invalidate_addr_x0..28` in `linkage_aarch64.S`;
+  - `do_unalignedwritestub` (SWL/SWR/SDL/SDR off the fast path) in `assem_arm64.c`.
+  - Any one of them would explain a SIGTRAP.
+- **Diagnostic core:** 0004 reverted, and the unaligned-store stub tagged `brk #0x51`, so its
+  trap could be told apart. Run from the board's `/tmp`; the installed core was left alone.
+  - Reproduced: status 133 after 3 s.
+  - The kernel printed nothing: `debug.exception-trace` is 0 on this image. Set it to 1 for
+    the session (and back to 0 afterwards).
+  - Report: `User debug trap in pn64-test.so[1c3358]`. addr2line puts this at
+    **`fp_exception_ds`**, not in the generated code and not the tagged stub.
+- **The bug:** `fp_exception_ds` raises Coprocessor Unusable for an FPU instruction in a branch
+  delay slot while Status.CU1 is clear (lazy FPU switching). The ARM64 version is
+  instruction-for-instruction the 32-bit ARM one, **plus a leading `brk 0`**. Any game that hits
+  that case dies; GoldenEye and Perfect Dark both do.
+- **New `libretro-paralleln64/0004`** removes that one line. The old 0004 (cartridge-ID check in
+  `main_init()`) is deleted. Clean `libretro-paralleln64-dirclean` build: all four patches
+  apply, and no diagnostic edits are left.
+- **On the board** (`board.sh zero3 push`, md5 `6ea15b3d…`), 40 s each on the installed core:
+
+| Game | Result | Speed |
+|---|---|---|
+| GoldenEye 007 | alive, **Dynamic Recompiler** | 98.4–100.1% |
+| Perfect Dark | alive, **Dynamic Recompiler** | 91.9–100.1% (first window loading) |
+| Super Mario 64 | alive | 92.9–100.2% |
+| Conker's Bad Fur Day | **SIGSEGV after 26 s** | 100% until then |
+
+- **Conker is a separate, older bug.** The pre-fix diagnostic core crashes at the same point
+  (23 s, `DABT ... level 0 translation fault`, `lr` 0). The K2B log's "Conker runs on the
+  dynarec at ~99–100%" came from a shorter run. Open.
+- Left open in the ARM64 port: the other `brk` placeholders. Nothing seen has hit them.
+- **The K2B** still runs the old core (the cached-interpreter workaround) until its next push.

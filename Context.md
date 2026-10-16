@@ -42,9 +42,10 @@ fragments. See BUILDING.md, "How the boards share the tree".
 3. **Raspberry Pi 4:** a new family layer (`board/bcm2711`): Raspberry Pi firmware boot instead
    of U-Boot, its kernel, Mesa V3D instead of panfrost. The shared layers should need no change
    beyond what the GPU driver choice forces (Mesa options, RetroArch video settings).
-4. **N64: GoldenEye 007 and Perfect Dark on the dynamic recompiler.** They crash parallel-n64's
-   ARM64 new_dynarec (SIGTRAP 2 s after `Init new dynarec`; both run code from TLB-mapped
-   memory). parallel-n64 patch 0004 works around it: these two cartridge IDs (`GE`, `PD`) run on
-   the cached interpreter at 85–100% in their intros, which may dip in heavy scenes. The real
-   fix is in the dynarec's TLB handling on ARM64 (or evaluating mupen64plus-next for them);
-   then drop 0004. Details: `docs/log/kickpi-k2b.md`.
+4. ~~**N64: GoldenEye 007 and Perfect Dark on the dynamic recompiler.**~~ Done 2026-10-16:
+   the SIGTRAP was a stray `brk 0` in the ARM64 `fp_exception_ds`, not TLB handling.
+   parallel-n64 0004 now removes it (the cached-interpreter workaround is gone). Both games run on
+   the dynarec at 97–100%. Verified on the Zero3; the K2B still runs the old core until its next
+   push. Details: `docs/log/opi-zero3.md`.
+5. **N64: Conker's Bad Fur Day segfaults** on the dynarec about 25 s in (SIGSEGV, level 0
+   translation fault). The cause predates the 0004 change: the old core does the same.

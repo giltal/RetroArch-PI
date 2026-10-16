@@ -131,6 +131,7 @@ benchmark (part 3).
 `Init new dynarec`). Fixed by parallel-n64 patch 0004: these two cartridge IDs run on the cached
 interpreter. Verified: GoldenEye 87.6–100.2%, Perfect Dark 84.6–99.1% in their intros (expect
 WARN rather than PASS in the sweep), Super Mario 64 still on the dynarec at 100%.
+That workaround was replaced on 2026-10-16 by the real fix (see the Zero3 entry below).
 
 ### Orange Pi Zero3
 
@@ -140,3 +141,8 @@ GoldenEye WARN (runs on the cached interpreter, no audio in its window); PSP Bur
 AC Bloodlines 100.6%, Gran Turismo 100.7%; Dreamcast SA2 / Crazy Taxi 2 / MSR 100.0% (threaded
 audio, as played); Metal Slug 101.4%, 1944 100.3%. Resident 2: SKIP (not on this card).
 \* Same .cue file-name problem as on the K2B's card.
+
+**2026-10-16, new parallel-n64 0004 (dynarec `fp_exception_ds` fix), N64 only, 40 s each:**
+GoldenEye 007 and Perfect Dark now on the **dynarec**, alive, settling at 100.1% (GoldenEye
+98–100%, Perfect Dark 92–100% over the run). Super Mario 64 100.2%. Conker's Bad Fur Day:
+**segfault after ~25 s**, the same on the old core (an earlier, separate bug).

@@ -54,3 +54,11 @@ another port, and the host drivers probed in the init thread.
 Both boards' extlinux.conf now have `driver_async_probe=ehci-platform,ohci-platform` (the K2B
 also keeps `dwmac-sun8i`). On the K2B, init went from 1.92 s to 1.11 s with the pad attached.
 Details in `docs/log/kickpi-k2b.md`.
+
+## 2026-10-16 — parallel-n64: GoldenEye and Perfect Dark back on the dynarec
+
+The SIGTRAP in both games was a stray `brk 0` at the start of the ARM64 `fp_exception_ds`
+(Coprocessor Unusable in a delay slot), not the TLB handling the K2B log suspected. The new
+parallel-n64 0004 removes it, and replaces the cached-interpreter workaround. Verified on the
+Zero3: both games run on the dynarec at ~100%. Found on the way: Conker's Bad Fur Day segfaults
+after ~25 s, with the old core too. Details in `docs/log/opi-zero3.md`.
