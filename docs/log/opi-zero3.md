@@ -1278,3 +1278,10 @@ was confirmed at 640x480. RetroArch's own core options can still change it per g
   - 44–48 °C.
 - `volumed` has no input device open: there's no power key on the Zero3 and no pad was
   connected. As before.
+- **U-Boot updated (morning, user present):** the new build's `u-boot-sunxi-with-spl.bin`
+  (`kernel_addr_r=0x40200000`).
+  - The old 8 KB–1 MiB region is backed up (md5 `e2a2bccf…`) on the board, in
+    `~/zero3/uboot-backup-8k.bin` and in `firmware/zero3/uboot-backup-8k-before-retroarch-pi.bin`.
+  - Write verified by reading back (`f8711b14…`).
+  - Reboot: init 0.88 s, link 1 Gbps, ROM card and launcher OK.
+  - The Zero3 now runs this tree's complete build.
