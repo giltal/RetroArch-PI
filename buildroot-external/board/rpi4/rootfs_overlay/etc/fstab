@@ -29,4 +29,7 @@ sysfs		/sys		sysfs	defaults	0	0
 # and exfat accept: a vfat-only option such as shortname= or utf8 makes an
 # exFAT mount fail outright, and the launcher then shows no games.
 # board/common/post-build.sh checks this line.
-/dev/mmcblk0p4	/opt/roms	auto	rw,noatime,umask=0022	0	0
+#
+# noauto: /etc/init.d/S02roms mounts it, with these options. It falls back to
+# p5 when Windows has turned p4 into an extended partition (see that script).
+/dev/mmcblk0p4	/opt/roms	auto	noauto,rw,noatime,umask=0022	0	0

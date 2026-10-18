@@ -1,0 +1,45 @@
+#!/bin/sh
+#
+# Mount the ROM partition at /opt/roms (Raspberry Pi 4 layout).
+#
+# As built it is p4, the fourth PRIMARY partition, and the image's small
+# variant leaves it at 2 GiB so it can be recreated over the whole card. But
+# Windows' Disk Management, asked for a new volume on an MBR disk that already
+# has three primaries (boot, rootfs, /data), makes p4 an EXTENDED partition and
+# puts the volume in it as a logical partition, p5. That happened on the first
+# Pi 4 card: p4 was a 1 KiB container, the ROMs were on p5 ("Retro ROMs"), and
+# the fstab mount of p4 failed ("exFAT-fs: failed to read boot sector").
+#
+# So: p4 if it is a real partition, else the first logical partition (p5).
+# The options come from the /opt/roms line in /etc/fstab (noauto there, so
+# mount -a leaves it to this script), which board/common/post-build.sh checks.
+# Runs before S12launcher and S46card, which both need /opt/roms.
+
+ROMS=/opt/roms
+DISK=mmcblk0
+
+case "$1" in
+	start)
+		printf "ROM partition: "
+		if grep -q " $ROMS " /proc/mounts; then echo "already mounted"; exit 0; fi
+		opts=$(awk -v m="$ROMS" '$1 !~ /^#/ && $2 == m { print $4 }' /etc/fstab \
+			| sed 's/\(^\|,\)noauto//; s/^,//')
+		dev=${DISK}p4
+		# An extended partition's entry in /sys is 2 sectors (1 KiB in /proc/partitions).
+		if [ "$(cat /sys/class/block/$dev/size 2>/dev/null || echo 0)" -le 2 ] \
+			&& [ -e /sys/class/block/${DISK}p5 ]; then
+			dev=${DISK}p5
+		fi
+		if mount -t auto -o "${opts:-rw,noatime,umask=0022}" "/dev/$dev" "$ROMS"; then
+			echo "$dev"
+		else
+			echo "FAIL ($dev)"
+		fi
+		;;
+	stop|restart|reload)
+		;;
+	*)
+		echo "Usage: $0 {start}"
+		exit 1
+esac
+exit 0

@@ -47,6 +47,17 @@ game_running() {
 	[ "$(rsh 'pidof retroarch.bin >/dev/null && echo y || echo n')" = y ]
 }
 
+# Modules must match the kernel they were built with: a config change can
+# add, remove or alter modules. Replace the tree wholesale (board.sh kernel).
+install_modules() {
+	KV=$(ls "$T/lib/modules" | head -1)
+	echo "modules: /lib/modules/$KV"
+	tar -C "$T/lib/modules" -cf - "$KV" | rsh "set -e; rm -rf /lib/modules/$KV.new; mkdir -p /lib/modules/$KV.new
+		tar -C /lib/modules/$KV.new -xf -
+		rm -rf /lib/modules/$KV.prev; [ -d /lib/modules/$KV ] && mv /lib/modules/$KV /lib/modules/$KV.prev
+		mv /lib/modules/$KV.new/$KV /lib/modules/$KV; rmdir /lib/modules/$KV.new"
+}
+
 cmd=${1:-status}; shift || true
 case "$cmd" in
 status)
@@ -95,10 +106,49 @@ push)
 	;;
 kernel)
 	if game_running; then echo "ABORT: a game is running on the board."; exit 2; fi
-	# The Pi boots its kernel from the FAT boot partition (p1), not from the
-	# rootfs's /boot: a different install, written with its first boot.
-	[ "$BOARD_BOOT" = extlinux ] || { echo "board.sh: kernel install for BOARD_BOOT=$BOARD_BOOT is not written yet" >&2; exit 1; }
 	DTB=$BOARD_DTB
+	if [ "$BOARD_BOOT" = rpi ]; then
+		# The Pi's firmware loads the kernel, DTB, config.txt and cmdline.txt
+		# from the FAT boot partition (p1), which is not mounted at runtime.
+		# Mount it, keep the last known-good set as *.prev, write *.new, sync,
+		# then rename over. Overlays are left alone (they come with the
+		# firmware package, not the kernel).
+		# The *.prev set stays on the FAT partition when it fits (recoverable
+		# from a PC: rename the files back); the first Pi 4 images had a 64 MiB
+		# boot partition, where Image + Image.prev + Image.new (3 x 29 MB) do
+		# not fit, and there it goes to /root/bootfs.prev on the rootfs instead
+		# (recoverable over SSH or the serial console only).
+		F=$I/rpi-firmware
+		ksize=$(( $(stat -c %s "$I/Image") / 1024 ))
+		rsh "set -e; mkdir -p /run/bootfs; grep -q ' /run/bootfs ' /proc/mounts || mount -t vfat /dev/mmcblk0p1 /run/bootfs
+			cd /run/bootfs; rm -f *.new
+			free=\$(df -k /run/bootfs | awk 'NR==2 {print \$4}')
+			if [ -f Image.prev ] || [ \"\$free\" -gt \$((2 * $ksize + 4096)) ]; then
+				for f in Image $DTB config.txt cmdline.txt; do [ -f \$f.prev ] || cp \$f \$f.prev; done
+				echo 'previous set: *.prev on the FAT boot partition'
+			else
+				mkdir -p /root/bootfs.prev
+				for f in Image $DTB config.txt cmdline.txt; do cp \$f /root/bootfs.prev/\$f; done
+				sync
+				echo 'previous set: /root/bootfs.prev (no room for it on the FAT partition)'
+			fi"
+		rcp "$I/Image" "root@$BOARD_IP:/run/bootfs/Image.new"
+		rcp "$I/$DTB" "root@$BOARD_IP:/run/bootfs/$DTB.new"
+		rcp "$F/config.txt" "root@$BOARD_IP:/run/bootfs/config.txt.new"
+		rcp "$F/cmdline.txt" "root@$BOARD_IP:/run/bootfs/cmdline.txt.new"
+		install_modules
+		rsh "set -e; cd /run/bootfs
+			grep -q '^kernel=Image' config.txt.new
+			grep -q 'root=/dev/mmcblk0p2 ' cmdline.txt.new
+			sync
+			for f in Image $DTB config.txt cmdline.txt; do mv -f \$f.new \$f; done
+			sync
+			echo \"board Image: \$(md5sum Image | cut -d' ' -f1)  $DTB: \$(md5sum $DTB | cut -d' ' -f1)\"
+			cd /; umount /run/bootfs"
+		echo "host  Image: $(md5sum "$I/Image" | cut -d' ' -f1)  $DTB: $(md5sum "$I/$DTB" | cut -d' ' -f1)"
+		echo "Reboot to use it. Previous set: see 'previous set:' above (*.prev on the FAT partition, or /root/bootfs.prev)"
+		exit 0
+	fi
 	# Keep the last known-good set, so a bad kernel is recoverable from the
 	# U-Boot prompt on the serial console instead of by reflashing the card.
 	rsh "cd /boot && cp -n Image Image.prev && cp -n $DTB $DTB.prev && cp -n extlinux/extlinux.conf extlinux/extlinux.conf.prev; [ -f Image.lz4 ] && cp -n Image.lz4 Image.lz4.prev; true"
@@ -110,14 +160,7 @@ kernel)
 	rcp "$I/Image" "root@$BOARD_IP:/boot/Image.new"
 	rcp "$I/$DTB" "root@$BOARD_IP:/boot/$DTB.new"
 	rcp "$T/boot/extlinux/extlinux.conf" "root@$BOARD_IP:/boot/extlinux/extlinux.conf.new"
-	# Modules must match the kernel they were built with: a config change can
-	# add, remove or alter modules. Replace the tree wholesale.
-	KV=$(ls "$T/lib/modules" | head -1)
-	echo "modules: /lib/modules/$KV"
-	tar -C "$T/lib/modules" -cf - "$KV" | rsh "set -e; rm -rf /lib/modules/$KV.new; mkdir -p /lib/modules/$KV.new
-		tar -C /lib/modules/$KV.new -xf -
-		rm -rf /lib/modules/$KV.prev; [ -d /lib/modules/$KV ] && mv /lib/modules/$KV /lib/modules/$KV.prev
-		mv /lib/modules/$KV.new/$KV /lib/modules/$KV; rmdir /lib/modules/$KV.new"
+	install_modules
 	rsh "set -e; cd /boot
 		sed -i 's/\r\$//' extlinux/extlinux.conf.new
 		grep -q '^ *kernel /boot/Image' extlinux/extlinux.conf.new

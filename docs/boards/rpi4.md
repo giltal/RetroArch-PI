@@ -2,8 +2,8 @@
 
 > Third board, and the first outside the Allwinner family. Build name: `rpi4` (to be added to
 > `scripts/boards.sh`; work directory `~/rpi4`). History will go in `docs/log/rpi4.md`.
-> Status: steps 1–2 done 2026-10-18: skeleton, and the first build (57 min, image in
-> `firmware/rpi4/`). Next: the first boot. Log: `docs/log/rpi4.md`.
+> Status: steps 1–3 done 2026-10-18: skeleton, first build (57 min), first boot (launcher,
+> GLES, HDMI audio, USB DS3, ROM card). Next: the read-only root. Log: `docs/log/rpi4.md`.
 
 The fundamentals stay the same as on the other boards: **the menu on HDMI within a few seconds of
 power-on**, and **nothing a power cut can break**. Everything below is judged against those two.
@@ -17,7 +17,7 @@ power-on**, and **nothing a power cut can break**. Everything below is judged ag
 | Kernel | **Raspberry Pi's fork** (`raspberrypi/linux`), as Buildroot's own `raspberrypi4_64_defconfig` uses. The firmware's DT overlays (vc4-kms-v3d, UART, gpio-shutdown) are written for it. Pinned: `rpi-6.18.y` @ `2341883` (6.18.57), the same series as the Allwinner boards' 6.18.53 |
 | Power-cut safety | **Read-only root filesystem**, as a shared change (all boards in the end). Writable state goes to a small journaled data partition |
 | Gamepad | PS3 pad over **USB** first. Onboard Bluetooth (BCM43455, mainline/RPi drivers exist) later. Note: the DS3 is classic Bluetooth, not BLE; the chip does both |
-| Hardware | 1 or 2 GB RAM (exact size still to confirm), fan/cooled case, Ethernet. **No serial adapter yet**: the K2B's (COM8) can move over, and should for bring-up |
+| Hardware | **1 GB** RAM (970,752 KiB seen by the kernel; 256 MiB of it CMA), fan/cooled case, Ethernet. **No serial adapter yet**: the K2B's (COM8) can move over, and should for bring-up |
 
 ## Hardware — Raspberry Pi 4 Model B
 
@@ -54,10 +54,10 @@ Shared files that are Allwinner-specific today and must become per-family:
 
 | Part. | FS | Size | Mounted | Contents |
 |---|---|---|---|---|
-| p1 | FAT32 | 64 MB | not mounted at runtime (only by `board.sh kernel`) | firmware (`start4.elf`, `fixup4.dat`), `config.txt`, `cmdline.txt`, kernel, DTB, overlays |
+| p1 | FAT32 | 128 MB (64 MB on the first images) | not mounted at runtime (only by `board.sh kernel`) | firmware (`start4.elf`, `fixup4.dat`), `config.txt`, `cmdline.txt`, kernel, DTB, overlays |
 | p2 | ext4, **read-only** | 1 GB | `/` ro | the system |
 | p3 | ext4, journaled | 64 MB | `/data` rw | everything that must persist (below) |
-| p4 | exFAT | rest of card | `/opt/roms` | ROMs, saves, states, launcher data (as on the other boards) |
+| p4 | exFAT | rest of card | `/opt/roms` (mounted by `S02roms`: p4, or p5 if Windows made p4 an extended partition) | ROMs, saves, states, launcher data (as on the other boards) |
 
 What writes to the root today, and where it goes (from the init scripts):
 - `/etc/asound.conf`: S11alsa regenerates it at boot (only writes when it changes). Moves to `/run`
@@ -103,7 +103,7 @@ measure it first, with a stopwatch and serial timestamps (`sertime.ps1` as on th
    Allwinner builds must stay byte-identical (check their `.config` and image contents).
 2. ~~**First build**~~ Done 2026-10-18, 57 min. (several hours: LLVM, Mesa, cores, on a new toolchain for the A72). Check every
    defconfig line in `.config`.
-3. **First boot**, writable root first: firmware → kernel → launcher on HDMI, Ethernet, SSH key
+3. ~~**First boot**~~ Done 2026-10-18 (Game Boy with sound; GPU-heavy cores not yet tried)., writable root first: firmware → kernel → launcher on HDMI, Ethernet, SSH key
    login, HDMI audio, USB DS3, a game per GPU core (PSP, Dreamcast, N64).
 4. **Read-only root + `/data`** on the Pi 4, then power-cut tests: pull the plug during a game, a
    save, a settings change and a boot; the next boot must be clean every time.

@@ -114,3 +114,75 @@ Nothing needed fixing.
     refuse the stream. Expected fix: slave `hdmi:CARD=vc4hdmi0,DEV=0` (alsa-lib's
     `vc4-hdmi.conf` wraps the iec958 plugin). To verify at the first boot, not guessed now.
   - `board.sh kernel` for the Pi (the FAT p1) is still to write.
+
+## 2026-10-18 — Step 3: first boot
+
+The user flashed `sdcard-small.img.xz` to a 64 GB card. Windows' Disk Management then
+recreated the ROM partition over the whole card.
+
+An earlier card was dropped. Its factory partition was 64 GB, matching its 64 GB label, but
+the card itself reported 240 GiB, and Etcher failed to write it. That looks like a faulty
+controller, not a counterfeit (a counterfeit's label would show the larger number).
+
+**Found it on the LAN** without a serial console: a ping sweep, then `arp -a` for Raspberry Pi
+OUIs gave `d8:3a:dd:d4:15:d8` at 10.100.102.89 (now `~/rpi4/board_ip`). The dev SSH key worked
+at once. It is a **1 GB** board (970,752 KiB, 256 MiB of it CMA); CPU at 1.8 GHz
+(`arm_boost`).
+
+**HDMI showed nothing, and three things were wrong:**
+1. **No module could load.**
+   - `bcm2711_defconfig` compresses modules (`.ko.xz`). The build's depmod (host-kmod
+     without xz) wrote an **empty `modules.dep`**, and BusyBox modprobe cannot read xz either.
+     `lsmod` was empty.
+   - Fix: `# CONFIG_MODULE_COMPRESS is not set` in the bcm2711 fragment. Now 1,860 plain
+     `.ko` files and a full `modules.dep`.
+2. **vc4 never bound.**
+   - `devices_deferred`: `gpu` "(reason unknown)". Every component (hvs, pixelvalves,
+     hdmi0/1, txp) had its driver, and vc4 retried until 11 s. It was waiting on the HDMI
+     ports' DDC (EDID) I²C adapters, which `i2c-brcmstb` provides, and that is `=m` in
+     `bcm2711_defconfig`.
+   - **Proved live:** `xz -d` of the module on the host, `insmod` on the board. vc4 bound at
+     once: HDMI-A-1 connected 1920x1080, fbcon on the TV, `vc4hdmi0`/`vc4hdmi1` sound cards.
+   - Fix: `CONFIG_I2C_BRCMSTB=y`.
+3. **The ROM partition did not mount.**
+   - Windows had made **p4 an extended partition** with the volume as logical **p5**. On an
+     MBR disk with three primaries already, that is what Disk Management does. The fstab
+     mount of p4 failed ("exFAT-fs: failed to read boot sector").
+   - Fix, Pi only (`board/rpi4`): the fstab ROM line is `noauto`, and the new
+     `/etc/init.d/S02roms` mounts p4, or p5 when p4 is a 2-sector container, with the fstab
+     line's options. bcm2711 post-build checks both.
+
+**HDMI audio, as predicted:**
+- `hw:0,0` accepts only `IEC958_SUBFRAME_LE` ("Sample format non available"), and
+  `hdmi:CARD=vc4hdmi0,DEV=0` (alsa-lib's iec958 wrapper) plays.
+- `S11alsa` (common) now slaves softvol to `hdmi:CARD=<id>,DEV=0` for `vc4hdmi*` cards, and
+  to `hw:N,0` as before for every other card.
+- Tested live: `default` playback rc 0, Master 40%.
+- **The user played Game Boy games with sound**, through the live-fixed setup.
+
+**`board.sh kernel` for the Pi** (`BOARD_BOOT=rpi`):
+- It mounts p1 at `/run/bootfs`, writes `*.new`, checks `config.txt`/`cmdline.txt`, syncs,
+  renames over, then replaces the module tree (shared `install_modules`).
+- The first run hit **"No space left on device"**: Image + Image.prev + Image.new is 3 x 29 MB,
+  and p1 was 64 MiB. Nothing had been replaced.
+- Now the `.prev` set stays on the FAT partition only when it fits, else it goes to
+  `/root/bootfs.prev`.
+- New images get a **128 MiB** boot partition (image 28,868 MiB, 30.27e9 bytes, still within
+  a 32 GB card), so the `.prev` set stays on the FAT partition and can be restored from a PC.
+- Installed: Image md5 `61edc208…` and the DTB match on host and board. Pushed S11alsa,
+  S02roms and fstab.
+
+**Reboot: everything came up by itself.**
+- vc4 is card0, HDMI-A-1 is connected at 1920x1080, fbcon is on, and the launcher is running.
+- Both HDMI sound cards are present, and `asound.conf` routes through `hdmi:CARD=vc4hdmi0`.
+- `/opt/roms` is mounted from p5, `/data` from p3, and eth0 is up.
+- The **USB PS3 pad** enumerated (`054c:0268`).
+- CPU 1800 MHz, 47 °C.
+
+**The cost of working modules:** rcS now ends at **4.29 s** (it was 2.11 s with nothing
+loading). udev loads Wi-Fi (`brcmfmac`, with no firmware: "Direct firmware load ... failed"),
+cfg80211 (no `regulatory.db`), `vc_sm_cma` and more. That is for step 5: build in what is
+needed, and stop the rest from loading.
+
+**Also noted:** the launcher's startup log prints "Platform: Orange Pi Zero3 (Allwinner H618)"
+on every board (a hard-coded line, cosmetic).

@@ -27,8 +27,8 @@ ROMS_IMG="${BINARIES_DIR}/roms.exfat"
 # their real capacity varies by brand from ~30.5e9 to ~32.0e9 bytes. The whole
 # image is 1 MiB (bootloader) + 1024 MiB (rootfs) + this, so 27648 MiB makes
 # a 28673 MiB (30.07e9 byte) image, which fits every 32 GB card seen so far.
-# (Pi 4: 4 MiB + 64 MiB boot + 1024 + 64 MiB /data + this = 28804 MiB,
-# 30.20e9 bytes, which still fits.)
+# (Pi 4: 4 MiB + 128 MiB boot + 1024 + 64 MiB /data + this = 28868 MiB,
+# 30.27e9 bytes, which still fits.)
 # Override for other cards, e.g. RETROOPI_ROMS_SIZE_MB=2048 for a small
 # dev image, or ~57000 for a 64 GB card.
 ROMS_SIZE_MB="${RETROOPI_ROMS_SIZE_MB:-27648}"

@@ -54,5 +54,10 @@ awk '$1 == "/dev/mmcblk0p3" && $2 == "/data"' "$TARGET_DIR/etc/fstab" | grep -q 
 	|| fail "/etc/fstab has no /dev/mmcblk0p3 /data line"
 awk '$1 == "/dev/mmcblk0p4" && $2 == "/opt/roms"' "$TARGET_DIR/etc/fstab" | grep -q . \
 	|| fail "/etc/fstab: the ROM partition must be /dev/mmcblk0p4 on the Pi 4"
+# The ROM line is noauto: S02roms mounts it (p4, or p5 when Windows has made
+# p4 an extended partition). Without the script nothing mounts /opt/roms.
+awk '$2 == "/opt/roms" && $4 ~ /(^|,)noauto(,|$)/' "$TARGET_DIR/etc/fstab" | grep -q . \
+	|| fail "/etc/fstab: the /opt/roms line must be noauto (S02roms mounts it)"
+[ -f "$TARGET_DIR/etc/init.d/S02roms" ] || fail "no /etc/init.d/S02roms -- the ROM partition would never mount"
 
 echo "post-build.sh (bcm2711): boot partition files, config.txt, cmdline.txt and fstab OK"
