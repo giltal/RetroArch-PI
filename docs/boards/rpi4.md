@@ -108,7 +108,9 @@ measure it first, with a stopwatch and serial timestamps (`sertime.ps1` as on th
    login, HDMI audio, USB DS3, a game per GPU core (PSP, Dreamcast, N64).
 4. **Read-only root + `/data`** on the Pi 4, then power-cut tests: pull the plug during a game, a
    save, a settings change and a boot; the next boot must be clean every time.
-5. **Boot-time pass:** measure each stage, then cut.
+5. **Boot-time pass:** first pass done 2026-10-18: 12 s → ~9.5 s by stopwatch (kernel to menu
+   4.3 → 2.1 s; EEPROM bootloader updated). The ~7 s before Linux is parked: needs the firmware
+   log over serial (`uart_2ndstage=1`), or a check of how long the TV takes to show the first picture.
 6. **Release sweep** (`docs/test-plan.md`), with the Pi's numbers in it.
 7. Later: onboard Bluetooth for the pad; the power button on GPIO3 (off and on); then the read-only
    root back on the Zero3/K2B.

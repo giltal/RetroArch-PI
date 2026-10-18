@@ -250,3 +250,23 @@ write.
 
 **Still to measure:** the stopwatch, power-on to menu, now that both the gzip kernel and the
 new bootloader are in.
+
+**Stopwatch after both changes: ~9.5 s** (was 12 s). The kernel accounts for ~2.2 s of the
+gain, so the gzip kernel and the new bootloader saved only ~0.3 s before Linux. Pre-kernel is
+still ~7.4 s by stopwatch.
+
+**Remote A/B of firmware settings.** `reboot` → SSH answers, minus the uptime at that moment,
+gives shutdown + bootloader + firmware: **11.6–11.8 s** (±0.5 s noise). Two reboots per
+variant, original `config.txt` restored afterwards:
+- `disable_fw_kms_setup=1`: no change.
+- `force_eeprom_read=0` + `disable_poe_fan=1`: no change before the kernel, but rcS ended at
+  4.0 s instead of 1.9 s. Out.
+- Both together: no change.
+
+**Open, parked by the user ("9.5 is reasonable, later"):**
+- Is the firmware really slow? Its log can't be read from Linux (`/dev/mem` is blocked by
+  `STRICT_DEVMEM`). `uart_2ndstage=1` with a serial adapter on pins 6/8/10 would show it with
+  timestamps.
+- Or is part of the stopwatch time the TV? Nothing drives HDMI until vc4 starts at kernel
+  ~0.3 s (no splash, no firmware picture), and the TV then needs its own time to lock on. To
+  check: when does the first picture appear on a power-on?
