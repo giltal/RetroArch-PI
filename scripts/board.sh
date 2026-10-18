@@ -119,33 +119,44 @@ kernel)
 		# not fit, and there it goes to /root/bootfs.prev on the rootfs instead
 		# (recoverable over SSH or the serial console only).
 		F=$I/rpi-firmware
-		ksize=$(( $(stat -c %s "$I/Image") / 1024 ))
+		# The kernel file is whatever the new config.txt names (Image, Image.gz).
+		# The previous set is the kernel the card's CURRENT config.txt names,
+		# plus DTB, config.txt and cmdline.txt; when the name changes, the old
+		# kernel goes into the previous set and then off p1.
+		K=$(sed -n 's/^kernel=//p' "$F/config.txt")
+		[ -n "$K" ] && [ -s "$I/$K" ] || { echo "board.sh: config.txt kernel=$K, not in $I" >&2; exit 1; }
+		ksize=$(( $(stat -c %s "$I/$K") / 1024 ))
 		rsh "set -e; mkdir -p /run/bootfs; grep -q ' /run/bootfs ' /proc/mounts || mount -t vfat /dev/mmcblk0p1 /run/bootfs
 			cd /run/bootfs; rm -f *.new
+			oldk=\$(sed -n 's/^kernel=//p' config.txt)
 			free=\$(df -k /run/bootfs | awk 'NR==2 {print \$4}')
-			if [ -f Image.prev ] || [ \"\$free\" -gt \$((2 * $ksize + 4096)) ]; then
-				for f in Image $DTB config.txt cmdline.txt; do [ -f \$f.prev ] || cp \$f \$f.prev; done
+			oldsize=\$(( \$(wc -c < \$oldk) / 1024 ))
+			# Room for the old kernel's .prev copy AND the new kernel's .new, plus 4 MiB.
+			if ls *.prev >/dev/null 2>&1 || [ \"\$free\" -gt \$((oldsize + $ksize + 4096)) ]; then
+				for f in \$oldk $DTB config.txt cmdline.txt; do [ -f \$f.prev ] || cp \$f \$f.prev; done
 				echo 'previous set: *.prev on the FAT boot partition'
 			else
-				mkdir -p /root/bootfs.prev
-				for f in Image $DTB config.txt cmdline.txt; do cp \$f /root/bootfs.prev/\$f; done
+				rm -rf /root/bootfs.prev; mkdir -p /root/bootfs.prev
+				for f in \$oldk $DTB config.txt cmdline.txt; do cp \$f /root/bootfs.prev/\$f; done
 				sync
-				echo 'previous set: /root/bootfs.prev (no room for it on the FAT partition)'
+				echo \"previous set: /root/bootfs.prev (\$oldk; no room for it on the FAT partition)\"
 			fi"
-		rcp "$I/Image" "root@$BOARD_IP:/run/bootfs/Image.new"
+		rcp "$I/$K" "root@$BOARD_IP:/run/bootfs/$K.new"
 		rcp "$I/$DTB" "root@$BOARD_IP:/run/bootfs/$DTB.new"
 		rcp "$F/config.txt" "root@$BOARD_IP:/run/bootfs/config.txt.new"
 		rcp "$F/cmdline.txt" "root@$BOARD_IP:/run/bootfs/cmdline.txt.new"
 		install_modules
 		rsh "set -e; cd /run/bootfs
-			grep -q '^kernel=Image' config.txt.new
+			grep -q '^kernel=$K\$' config.txt.new
 			grep -q 'root=/dev/mmcblk0p2 ' cmdline.txt.new
+			oldk=\$(sed -n 's/^kernel=//p' config.txt)
 			sync
-			for f in Image $DTB config.txt cmdline.txt; do mv -f \$f.new \$f; done
+			for f in $K $DTB config.txt cmdline.txt; do mv -f \$f.new \$f; done
 			sync
-			echo \"board Image: \$(md5sum Image | cut -d' ' -f1)  $DTB: \$(md5sum $DTB | cut -d' ' -f1)\"
+			[ \"\$oldk\" = $K ] || { rm -f \"\$oldk\"; echo \"removed the old kernel \$oldk from p1 (it is in the previous set)\"; }
+			echo \"board $K: \$(md5sum $K | cut -d' ' -f1)  $DTB: \$(md5sum $DTB | cut -d' ' -f1)\"
 			cd /; umount /run/bootfs"
-		echo "host  Image: $(md5sum "$I/Image" | cut -d' ' -f1)  $DTB: $(md5sum "$I/$DTB" | cut -d' ' -f1)"
+		echo "host  $K: $(md5sum "$I/$K" | cut -d' ' -f1)  $DTB: $(md5sum "$I/$DTB" | cut -d' ' -f1)"
 		echo "Reboot to use it. Previous set: see 'previous set:' above (*.prev on the FAT partition, or /root/bootfs.prev)"
 		exit 0
 	fi

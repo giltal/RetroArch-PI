@@ -92,8 +92,9 @@ measure it first, with a stopwatch and serial timestamps (`sertime.ps1` as on th
   loading in the critical path, and less udev work.
 - `cmdline.txt`: `quiet loglevel=4`, `rootwait`, `ro`, the same settle-free udev, async probe where
   it helps (USB through the VL805 is PCIe here).
-- The EEPROM bootloader's own settings (e.g. `BOOT_UART=0`, the boot order) are changed only by
-  flashing the EEPROM. That is outside the image; only with the user's go-ahead.
+- The EEPROM bootloader: updated 2026-10-18 from 2023-01 to the 2026-09-23 stable release, with
+  `NET_INSTALL_AT_POWER_ON=0` (`scripts/rpi4-eeprom.sh`, config in `board/rpi4/eeprom-bootconf.txt`).
+  It changes the board, not the card: only with the user's go-ahead, every time.
 
 ## Steps
 

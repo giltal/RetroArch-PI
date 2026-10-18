@@ -37,8 +37,15 @@ grep -q '^dtoverlay=vc4-kms-v3d-pi4.*,cma-[0-9]' "$cfg" \
 	|| fail "config.txt: vc4-kms-v3d-pi4 has no cma- parameter -- 1080p scanout buffers will not fit"
 # The kernel and DTB config.txt names must be the ones genimage puts on p1.
 k=$(sed -n 's/^kernel=//p' "$cfg")
-[ "$k" = Image ] && [ -s "$BINARIES_DIR/Image" ] \
-	|| fail "config.txt kernel=$k, expected Image (and $BINARIES_DIR/Image)"
+[ -n "$k" ] && [ -s "$BINARIES_DIR/$k" ] \
+	|| fail "config.txt kernel=$k, which is not in $BINARIES_DIR"
+grep -q "\"$k\"" "$BR2_EXTERNAL_RETROOPI_PATH/board/rpi4/genimage.cfg" \
+	|| fail "config.txt boots $k, but board/rpi4/genimage.cfg does not put it on p1"
+# A gzip kernel must really be gzip: the firmware unpacks it by its magic.
+case "$k" in *.gz)
+	[ "$(od -A n -t x1 -N 2 "$BINARIES_DIR/$k" | tr -d ' ')" = 1f8b ] \
+		|| fail "$k is not gzip-compressed" ;;
+esac
 d=$(sed -n 's/^device_tree=//p' "$cfg")
 [ -s "$BINARIES_DIR/$d" ] || fail "config.txt device_tree=$d, not in $BINARIES_DIR"
 

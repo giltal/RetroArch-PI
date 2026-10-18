@@ -186,3 +186,67 @@ needed, and stop the rest from loading.
 
 **Also noted:** the launcher's startup log prints "Platform: Orange Pi Zero3 (Allwinner H618)"
 on every board (a hard-coded line, cosmetic).
+
+## 2026-10-18 — Boot time, first pass: kernel side and the EEPROM bootloader
+
+The user's stopwatch said **12 s** to the menu (the H616 boards take ~6 s). Kernel time to the
+menu was only ~4.3 s. So **~7 s came before Linux**: the EEPROM bootloader, `start4.elf` and
+the kernel load.
+
+**Kernel side, measured with one `initcall_debug` boot** (`cmdline.txt` restored afterwards).
+The biggest items:
+
+| Item | Time | Fix |
+|---|---|---|
+| `init_kprobe_trace` | 393 ms | `# CONFIG_KPROBE_EVENTS`, `# CONFIG_FTRACE` (debug features from `bcm2711_defconfig`) |
+| bcmgenet + PHY | 193 ms | `driver_async_probe=bcmgenet,brcm-pcie,xhci_hcd` |
+| PCIe link (VL805) | 115 ms | same |
+| xHCI | 94 ms | same |
+| deferred probes (vc4) | 170 ms | — |
+
+Also removed, because udev loaded them at every boot alongside rcS:
+- the camera, codec, ISP, HEVC, MMAL, `vc_sm_cma` and VideoCore analog audio drivers (now
+  `not set`);
+- `brcmfmac` + `cfg80211` (no firmware for either): `dtoverlay=disable-wifi`;
+- `hci_uart`: `dtparam=krnbt=off`. Both lines go when the onboard radios are wanted.
+
+**`Image.gz`** (`BR2_LINUX_KERNEL_IMAGEGZ`): 10.3 MB for the firmware to read instead of the
+28.9 MB `Image`. post-build checks the gzip magic and that genimage puts the named kernel on p1.
+
+Result, kernel time:
+
+| Marker | Before | After |
+|---|---|---|
+| SD card found | 2.82 s | **0.56 s** |
+| `/sbin/init` | 2.87 s | **0.59 s** |
+| Launcher start | 3.82 s | **1.40 s** |
+| Menu ready | ~4.3 s | **~2.07 s** |
+| Modules loaded | 29 | 5 |
+
+The Pi's kernel now reaches the menu sooner than the Zero3's (~2.7 s).
+
+**`board.sh kernel` (Pi), two bugs found on the way:**
+- The free-space check sized the `.prev` copy by the *new* kernel (10 MB). But it copies the
+  *old* one (29 MB), so p1 filled up ("No space left").
+- BusyBox has no `stat`; it uses `wc -c` now.
+- It now handles a kernel name change. The previous set is the kernel the card's current
+  `config.txt` names (the old `Image` went to `/root/bootfs.prev`), and that kernel is removed
+  from p1 after the switch.
+
+**EEPROM bootloader:** **2023-01 (`63bef4a4`) → `6ab3bfc6`**, the stable `default` channel
+`pieeprom-2026-09-23.bin` at rpi-eeprom `7ed1cc2`. The user approved the download and the
+write.
+- Downloaded files checked against the GitHub listing's sizes and git blob SHAs.
+- Config: the release defaults (`BOOT_UART=0`, `WAKE_ON_GPIO=1`, `POWER_OFF_ON_HALT=0`) with
+  **`NET_INSTALL_AT_POWER_ON=0`**. The default 1 means a USB keyboard scan for Shift at every
+  power-on. HDMI diagnostics are kept, which matters without a serial adapter.
+- Done the `rpi-eeprom-update` way: `pieeprom.upd` + `.sig` + `recovery.bin` on p1, reboot.
+  The ROM ran `recovery.bin`, which renamed itself `RECOVERY.000`.
+- `update-timestamp` = the `.sig`'s `ts` (`6ad52c8a`), so it was our file that got flashed.
+  SSH was back 28 s after the reboot command, flash included. The update files were then
+  removed from p1.
+- Repeatable as `scripts/rpi4-eeprom.sh [install]`, with the config in
+  `board/rpi4/eeprom-bootconf.txt`.
+
+**Still to measure:** the stopwatch, power-on to menu, now that both the gzip kernel and the
+new bootloader are in.

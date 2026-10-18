@@ -56,6 +56,10 @@ BR2_LINUX_KERNEL=y
 BR2_LINUX_KERNEL_CUSTOM_TARBALL=y
 BR2_LINUX_KERNEL_CUSTOM_TARBALL_LOCATION="$(call github,raspberrypi,linux,234188315037848e5b07d65b85d38edc64095caa)/linux-234188315037848e5b07d65b85d38edc64095caa.tar.gz"
 BR2_LINUX_KERNEL_DEFCONFIG="bcm2711"
+# Image.gz: the firmware reads ~10 MB off the card instead of the 29 MB Image,
+# and unpacks it itself (it handles gzip; the H616 boards do the same with LZ4
+# through U-Boot).
+BR2_LINUX_KERNEL_IMAGEGZ=y
 BR2_LINUX_KERNEL_CONFIG_FRAGMENT_FILES="$(BR2_EXTERNAL_RETROOPI_PATH)/board/common/linux-retrogaming.config $(BR2_EXTERNAL_RETROOPI_PATH)/board/bcm2711/linux-retrogaming.config"
 BR2_LINUX_KERNEL_DTS_SUPPORT=y
 BR2_LINUX_KERNEL_INTREE_DTS_NAME="broadcom/bcm2711-rpi-4-b"
