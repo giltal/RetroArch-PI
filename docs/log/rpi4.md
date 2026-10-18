@@ -81,3 +81,36 @@ That saves the LLVM/clang build and the 65 MB libLLVM on the target.
 - S11alsa's HDMI card detection on vc4 (step 3);
 - the read-only root (step 4);
 - `board.sh kernel` for the Pi.
+
+## 2026-10-18 — Step 2: first build, OK in 57 min
+
+`build.sh rpi4` worked on the first try in **57 min** (the Zero3 took 116 min with LLVM/clang).
+Nothing needed fixing.
+- **Config:**
+  - defconfig: 113 option lines, 0 lost.
+  - Both post-build scripts passed: common, including every kernel-fragment line against
+    `linux-custom/.config`, and bcm2711.
+  - Kernel `6.18.57-v8`: vc4, v3d, SND, bcmgenet, xHCI-PCI, exFAT, BT and HID_SONY all =y.
+  - The shared exFAT patch was applied.
+- **Image** (`firmware/rpi4/sdcard.img.xz`, 91 MB; md5 `15c4b2b3…`):
+  - p1 FAT32 64 MiB at 4 MiB;
+  - p2 ext4 1 GiB;
+  - p3 ext4 64 MiB (`RETRODATA`, journal, empty);
+  - p4 exFAT 27 GiB.
+  - Total 28,804 MiB, as planned.
+- **Boot partition:**
+  - `start4.elf`, `fixup4.dat`, `config.txt` and `cmdline.txt` as written;
+  - `bcm2711-rpi-4-b.dtb`;
+  - `Image`, 28.9 MB (the arm64 Image on the H616 boards is 44.7 MB);
+  - `overlays/` with 358 overlays, `vc4-kms-v3d-pi4.dtbo` among them.
+- **Rootfs:** 263 MB in `target/` (no libLLVM). Mesa 26.0.1 with `v3d_dri.so` and the
+  `vc4_dri.so` display stub, so the common Mesa patch 0001 works for vc4 too. All 23 cores.
+- **For later:**
+  - **1,861 kernel modules**: `bcm2711_defconfig` builds nearly everything as a module.
+    That costs udev work at boot and rootfs space. A candidate for the boot-time pass
+    (step 5).
+  - **HDMI audio:** `S11alsa` will pick `vc4hdmi0` (HDMI0), which is right. But vc4's HDMI
+    PCM takes only `IEC958_SUBFRAME_LE`, so a softvol slave of plain `hw:N,0` will most likely
+    refuse the stream. Expected fix: slave `hdmi:CARD=vc4hdmi0,DEV=0` (alsa-lib's
+    `vc4-hdmi.conf` wraps the iec958 plugin). To verify at the first boot, not guessed now.
+  - `board.sh kernel` for the Pi (the FAT p1) is still to write.

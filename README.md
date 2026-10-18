@@ -14,7 +14,7 @@ init scripts, tools) is shared, so a fix made for one board reaches all of them.
 |---|---|---|---|
 | **Orange Pi Zero3** | Allwinner H618, 4× Cortex-A53, Mali-G31 MP2 | 2 GB LPDDR4 | **Working.** The reference board: every system and setting below was measured on it |
 | **KickPi K2B V2.2** | Allwinner H618, 4× Cortex-A53, Mali-G31 MP2 | 2 GB DDR3 | **Working.** Boots to the launcher; HDMI video and audio, GPU, Gigabit Ethernet, ROM card, power button (clean shutdown). Same SoC as the Zero3, so the emulation results carry over. DualShock 3 over Bluetooth not yet re-tested |
-| Raspberry Pi 4 | Broadcom BCM2711, 4× Cortex-A72, V3D 4.2 | 1–8 GB | **In progress.** Board layer and defconfig written, not built yet; see [docs/boards/rpi4.md](docs/boards/rpi4.md) |
+| Raspberry Pi 4 | Broadcom BCM2711, 4× Cortex-A72, V3D 4.2 | 1–8 GB | **In progress.** Builds; first boot next; see [docs/boards/rpi4.md](docs/boards/rpi4.md) |
 
 **KickPi K2B: only the V2.2 is supported** (DDR3, Maxio MAE0621A Ethernet PHY).
 The V1 (LPDDR4, RTL8211F) needs a different U-Boot DRAM setup. eMMC is not

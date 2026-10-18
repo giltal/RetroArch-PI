@@ -2,8 +2,8 @@
 
 > Third board, and the first outside the Allwinner family. Build name: `rpi4` (to be added to
 > `scripts/boards.sh`; work directory `~/rpi4`). History will go in `docs/log/rpi4.md`.
-> Status: **step 1 (skeleton) done** 2026-10-18: layers, defconfig, per-family shared files.
-> Not built yet. Log: `docs/log/rpi4.md`.
+> Status: steps 1–2 done 2026-10-18: skeleton, and the first build (57 min, image in
+> `firmware/rpi4/`). Next: the first boot. Log: `docs/log/rpi4.md`.
 
 The fundamentals stay the same as on the other boards: **the menu on HDMI within a few seconds of
 power-on**, and **nothing a power cut can break**. Everything below is judged against those two.
@@ -101,7 +101,7 @@ measure it first, with a stopwatch and serial timestamps (`sertime.ps1` as on th
    swapped: `BR2_cortex_a72`, rpi-firmware, the RPi kernel, Mesa `v3d` + `vc4`), the
    `board/bcm2711` and `board/rpi4` layers, the shared files made per-family as listed above. The
    Allwinner builds must stay byte-identical (check their `.config` and image contents).
-2. **First build** (several hours: LLVM, Mesa, cores, on a new toolchain for the A72). Check every
+2. ~~**First build**~~ Done 2026-10-18, 57 min. (several hours: LLVM, Mesa, cores, on a new toolchain for the A72). Check every
    defconfig line in `.config`.
 3. **First boot**, writable root first: firmware → kernel → launcher on HDMI, Ethernet, SSH key
    login, HDMI audio, USB DS3, a game per GPU core (PSP, Dreamcast, N64).
