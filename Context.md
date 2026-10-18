@@ -41,8 +41,9 @@ fragments. See BUILDING.md, "How the boards share the tree".
    there: mupen64plus-next, hardware PSX renderers, PicoDrive, onboard Wi-Fi/BT
    (`docs/boards/opi-zero3.md`).
 3. **Raspberry Pi 4:** a new family layer (`board/bcm2711`): Raspberry Pi firmware boot instead
-   of U-Boot, its kernel, Mesa V3D instead of panfrost. The shared layers should need no change
-   beyond what the GPU driver choice forces (Mesa options, RetroArch video settings).
+   of U-Boot, the Raspberry Pi kernel, Mesa V3D instead of panfrost, and a **read-only root
+   filesystem** with a journaled data partition (to go back to every board later). Plan and
+   decisions: `docs/boards/rpi4.md`.
 4. ~~**N64: GoldenEye 007 and Perfect Dark on the dynamic recompiler.**~~ Done 2026-10-16:
    the SIGTRAP was a stray `brk 0` in the ARM64 `fp_exception_ds`, not TLB handling.
    parallel-n64 0004 now removes it (the cached-interpreter workaround is gone). Both games run on
