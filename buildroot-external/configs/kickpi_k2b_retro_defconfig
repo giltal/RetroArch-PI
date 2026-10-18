@@ -34,11 +34,12 @@ BR2_TARGET_GENERIC_ROOT_PASSWD="retroopi"
 BR2_ROOTFS_DEVICE_CREATION_DYNAMIC_EUDEV=y
 BR2_PACKAGE_BUSYBOX_SHOW_OTHERS=y
 BR2_ROOTFS_OVERLAY="$(BR2_EXTERNAL_RETROOPI_PATH)/board/common/rootfs_overlay $(BR2_EXTERNAL_RETROOPI_PATH)/board/kickpi-k2b/rootfs_overlay"
-# Two post-image scripts, run in order: ours builds the FAT32 ROM partition
+# Post-build: the shared checks, then the H616 boot-chain checks. Post-image:
+# two scripts, run in order: ours builds the exFAT ROM partition
 # image, then the stock wrapper assembles sdcard.img from genimage.cfg.
-BR2_ROOTFS_POST_BUILD_SCRIPT="$(BR2_EXTERNAL_RETROOPI_PATH)/board/common/post-build.sh"
+BR2_ROOTFS_POST_BUILD_SCRIPT="$(BR2_EXTERNAL_RETROOPI_PATH)/board/common/post-build.sh $(BR2_EXTERNAL_RETROOPI_PATH)/board/h616/post-build.sh"
 BR2_ROOTFS_POST_IMAGE_SCRIPT="$(BR2_EXTERNAL_RETROOPI_PATH)/board/common/post-image.sh support/scripts/genimage.sh"
-BR2_ROOTFS_POST_SCRIPT_ARGS="-c $(BR2_EXTERNAL_RETROOPI_PATH)/board/common/genimage.cfg"
+BR2_ROOTFS_POST_SCRIPT_ARGS="-c $(BR2_EXTERNAL_RETROOPI_PATH)/board/h616/genimage.cfg"
 BR2_GLOBAL_PATCH_DIR="$(BR2_EXTERNAL_RETROOPI_PATH)/board/common/patches $(BR2_EXTERNAL_RETROOPI_PATH)/board/h616/patches $(BR2_EXTERNAL_RETROOPI_PATH)/board/kickpi-k2b/patches"
 
 # --- Kernel -------------------------------------------------------------
@@ -48,7 +49,7 @@ BR2_LINUX_KERNEL=y
 BR2_LINUX_KERNEL_CUSTOM_VERSION=y
 BR2_LINUX_KERNEL_CUSTOM_VERSION_VALUE="6.18.53"
 BR2_LINUX_KERNEL_USE_ARCH_DEFAULT_CONFIG=y
-BR2_LINUX_KERNEL_CONFIG_FRAGMENT_FILES="$(BR2_EXTERNAL_RETROOPI_PATH)/board/h616/linux-retrogaming.config $(BR2_EXTERNAL_RETROOPI_PATH)/board/kickpi-k2b/linux.config"
+BR2_LINUX_KERNEL_CONFIG_FRAGMENT_FILES="$(BR2_EXTERNAL_RETROOPI_PATH)/board/common/linux-retrogaming.config $(BR2_EXTERNAL_RETROOPI_PATH)/board/h616/linux-retrogaming.config $(BR2_EXTERNAL_RETROOPI_PATH)/board/kickpi-k2b/linux.config"
 BR2_LINUX_KERNEL_DTS_SUPPORT=y
 BR2_LINUX_KERNEL_INTREE_DTS_NAME="allwinner/sun50i-h618-kickpi-k2b"
 BR2_LINUX_KERNEL_INSTALL_TARGET=y

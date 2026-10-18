@@ -10,7 +10,7 @@ on mainline Linux 6.18.53. **One tree, several boards:**
 |---|---|---|
 | Orange Pi Zero3 (`zero3`) | Allwinner H618, Mali-G31 MP2, 2 GB LPDDR4 | The reference board: almost every setting was measured on it |
 | KickPi K2B V2.2 (`k2b`) | Allwinner H618, Mali-G31 MP2, 2 GB DDR3 | Maxio MAE0621A PHY; V1 not supported; no eMMC |
-| Raspberry Pi 4 | BCM2711, V3D | Planned: its own family layer next to `board/h616` |
+| Raspberry Pi 4 (`rpi4`) | BCM2711, V3D 4.2 | In progress: family layer `board/bcm2711`, board `board/rpi4`; plan in `docs/boards/rpi4.md` |
 
 History: a port of RetroBPI_M2M (Banana Pi M2 Magic). The Zero3 tree (RetroOPI_Z3) became this
 repo; the K2B was first ported in its own tree and merged here. Both old folders are
@@ -27,9 +27,10 @@ repo; the K2B was first ported in its own tree and merged here. Both old folders
 
 | Layer | What lives there |
 |---|---|
-| `package/`, `launcher/`, `tools/`, `board/common/` | Shared by every board: RetroArch + cores, launcher, tools, rootfs overlay, post-build/post-image, genimage |
-| `board/h616/` | Shared by the Allwinner H616/H618 boards: Armbian kernel patches, kernel fragment, U-Boot fragment and patches |
-| `board/<board>/` | Only that board: DT patches, PHY/board drivers, U-Boot board config, kernel `linux.config`, `extlinux.conf` |
+| `package/`, `launcher/`, `tools/`, `board/common/` | Shared by every board: RetroArch + cores, launcher, tools, rootfs overlay, shared kernel fragment and patches, post-build (invariants), post-image (exFAT) |
+| `board/h616/` | Shared by the Allwinner H616/H618 boards: Armbian kernel patches, kernel fragment, U-Boot fragment and patches, genimage, boot-chain post-build |
+| `board/bcm2711/` | Raspberry Pi 4 family: kernel fragment, kernel hash, boot-chain post-build |
+| `board/<board>/` | Only that board: DT patches, PHY/board drivers, U-Boot board config, kernel `linux.config`, `extlinux.conf` (Pi 4: `config.txt`, `cmdline.txt`, genimage, fstab) |
 
 A fix found on one board belongs in the most generic layer it applies to. Both defconfigs are
 the same file apart from the board lines: change shared options in **both**, and keep the diff
@@ -54,7 +55,7 @@ between them limited to the board identity and layer paths. A new board also nee
 ## Development Environment
 
 - **Host OS:** Windows + WSL2 (Ubuntu 22.04). Per-board work directories (`scripts/boards.sh`):
-  `~/zero3`, `~/k2b`, each with `buildroot/`, `output/` (`O=`), `build.log`, `board_ip`.
+  `~/zero3`, `~/k2b`, `~/rpi4`, each with `buildroot/`, `output/` (`O=`), `build.log`, `board_ip`.
   Buildroot outputs are not relocatable: never rename a work directory.
   - `~/bpi/dl`: download cache, **shared** by all boards (and the old reference trees) on purpose.
   - `~/k2b/armbian-build`: sparse, blob-less Armbian clone (the K2B files: Maxio, V2 U-Boot).
@@ -72,7 +73,9 @@ between them limited to the board identity and layer paths. A new board also nee
 - **Line endings:** `.gitattributes` makes every text file LF (`* text=auto eol=lf`), whatever
   `core.autocrlf` says; three core patches are deliberately CRLF (`-text`). Check with
   `git ls-files --eol` (look for `w/crlf`). **In this Git Bash, `grep $'\r'` does not match CR**:
-  it reported CRs in LF files. Python on Windows writes CRLF in text mode: use `newline=''`.
+  it reported CRs in LF files. Python on Windows writes CRLF in text mode: use `newline=''`. It also reads and writes
+  cp1252 by default, which corrupts any non-ASCII character it writes (`—`, `×`): pass
+  `encoding='utf-8'` too.
 - **Empty directories do not survive git** (`/opt/roms` was lost that way). Create them in
   `post-build.sh`.
 
@@ -126,14 +129,17 @@ C:\RetroArch_PI
   README.md, BUILDING.md, Context.md, DevelopmentLog.md (shared work)
   docs/  flashing.md, boards/<board>.md, log/<board>.md
   buildroot-external/
-    configs/  opi_zero3_retro_defconfig, kickpi_k2b_retro_defconfig
+    configs/  opi_zero3_retro_defconfig, kickpi_k2b_retro_defconfig, rpi4_retro_defconfig
     package/  retroarch (RetroArch + cores, Flycast/PPSSPP patches), retroopi-launcher, retroopi-tools
-    board/common/     rootfs_overlay/, post-build.sh (invariants), post-image.sh (exFAT), genimage.cfg,
+    board/common/     rootfs_overlay/, linux-retrogaming.config, post-build.sh (invariants), post-image.sh (exFAT),
+                      patches/linux (0001 exFAT readahead, both kernels),
                       patches/ (bluez5_utils, libretro-fuse, mesa3d)
-    board/h616/       linux-retrogaming.config, uboot-fastboot.config,
-                      patches/linux (Armbian 0001-0052 + README), patches/uboot (kernel_addr_r)
+    board/h616/       linux-retrogaming.config, uboot-fastboot.config, genimage.cfg, post-build.sh,
+                      patches/linux (Armbian 0001-0049 + README), patches/uboot (kernel_addr_r)
+    board/bcm2711/    linux-retrogaming.config, post-build.sh, patches/linux/linux.hash
     board/opi-zero3/  linux.config, patches/linux (0046/0047/0050/0051), extlinux.conf
-    board/kickpi-k2b/ linux.config, patches/linux (0060-0065), patches/uboot (0001-0002), extlinux.conf
+    board/kickpi-k2b/ linux.config, patches/linux (0060-0066), patches/uboot (0001-0002), extlinux.conf
+    board/rpi4/       config.txt, cmdline.txt, genimage.cfg, rootfs_overlay/etc/fstab
   launcher/  tools/
   scripts/   boards.sh, build.sh, board.sh, serial.ps1, fetch-thumbnails.py, gen-*.py
   firmware/<board>/   build output (gitignored)

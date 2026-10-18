@@ -6,7 +6,7 @@
 #   wsl bash /mnt/c/RetroArch_PI/scripts/build.sh <board> linux       # one target
 #   wsl bash /mnt/c/RetroArch_PI/scripts/build.sh <board> defconfig   # re-apply defconfig
 #
-# <board> is one of the names in scripts/boards.sh (zero3, k2b).
+# <board> is one of the names in scripts/boards.sh (zero3, k2b, rpi4).
 #
 # Layout, per board (BOARD_WORK in boards.sh):
 #   <work>/buildroot  Buildroot 2026.02.3, cloned from ~/bpi/buildroot

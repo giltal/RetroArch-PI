@@ -1,0 +1,32 @@
+# <file system>	<mount pt>	<type>	<options>	<dump>	<pass>
+/dev/root	/		ext2	rw,noauto	0	1
+proc		/proc		proc	defaults	0	0
+devpts		/dev/pts	devpts	defaults,gid=5,mode=620,ptmxmode=0666	0	0
+tmpfs		/dev/shm	tmpfs	mode=1777	0	0
+tmpfs		/tmp		tmpfs	mode=1777	0	0
+tmpfs		/run		tmpfs	mode=0755,nosuid,nodev	0	0
+sysfs		/sys		sysfs	defaults	0	0
+
+# Raspberry Pi 4 layout (board/rpi4/genimage.cfg): p1 FAT boot (not mounted),
+# p2 rootfs, p3 /data, p4 ROMs. Replaces board/common's fstab, whose ROM
+# partition is p2 (the H616 layout). Keep the lines below in step with it.
+#
+# mmcblk0 is the SD card: the Pi 4's device tree aliases emmc2 (the SD slot)
+# as mmc0, and the other MMC host (the Wi-Fi SDIO) as mmc1.
+
+# /data: the journaled ext4 partition for what must persist once the root is
+# read-only (docs/boards/rpi4.md). Empty as built.
+/dev/mmcblk0p3	/data		ext4	rw,noatime	0	0
+
+# ROM partition: exFAT as built (post-image.sh), or FAT32 if reformatted. The
+# launcher hardcodes /opt/roms and scans one subdirectory per system; see
+# launcher/launcher.c. /etc/init.d/S46card creates the folders on first boot.
+#
+# umask=0022 rather than the vfat default so ROMs are world-readable; FAT has no
+# permission bits of its own, so they come from the mount options.
+#
+# Type "auto", so either filesystem mounts. The options must be ones BOTH vfat
+# and exfat accept: a vfat-only option such as shortname= or utf8 makes an
+# exFAT mount fail outright, and the launcher then shows no games.
+# board/common/post-build.sh checks this line.
+/dev/mmcblk0p4	/opt/roms	auto	rw,noatime,umask=0022	0	0

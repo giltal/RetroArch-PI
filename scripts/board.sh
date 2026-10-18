@@ -4,7 +4,7 @@
 #
 #   wsl bash /mnt/c/RetroArch_PI/scripts/board.sh <board> <cmd> [args]
 #
-#   <board> is one of the names in scripts/boards.sh (zero3, k2b).
+#   <board> is one of the names in scripts/boards.sh (zero3, k2b, rpi4).
 #
 #   status                 hostname, uptime, IP, what is running, temps, DRM/ALSA
 #   push <path>...         copy target/ files (absolute board paths, e.g.
@@ -95,6 +95,9 @@ push)
 	;;
 kernel)
 	if game_running; then echo "ABORT: a game is running on the board."; exit 2; fi
+	# The Pi boots its kernel from the FAT boot partition (p1), not from the
+	# rootfs's /boot: a different install, written with its first boot.
+	[ "$BOARD_BOOT" = extlinux ] || { echo "board.sh: kernel install for BOARD_BOOT=$BOARD_BOOT is not written yet" >&2; exit 1; }
 	DTB=$BOARD_DTB
 	# Keep the last known-good set, so a bad kernel is recoverable from the
 	# U-Boot prompt on the serial console instead of by reflashing the card.

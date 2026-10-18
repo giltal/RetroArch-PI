@@ -62,3 +62,20 @@ The SIGTRAP in both games was a stray `brk 0` at the start of the ARM64 `fp_exce
 parallel-n64 0004 removes it, and replaces the cached-interpreter workaround. Verified on the
 Zero3: both games run on the dynarec at ~100%. Found on the way: Conker's Bad Fur Day segfaults
 after ~25 s, with the old core too. Details in `docs/log/opi-zero3.md`.
+
+## 2026-10-18 — Raspberry Pi 4: plan and skeleton; shared files made per family
+
+The Pi 4 gets a family layer, `board/bcm2711`, and a board layer, `board/rpi4`. It uses the
+Raspberry Pi kernel (`rpi-6.18.y`, 6.18.57) and VideoCore firmware boot. Mesa runs v3d without
+LLVM. The layout adds a `/data` partition for the planned read-only root. Plan:
+`docs/boards/rpi4.md`; details: `docs/log/rpi4.md`.
+
+For it, these shared files became per family, and the H616 boards' effective config did not
+change:
+- **Kernel fragment:** split into `common` and `h616` (same 77 lines).
+- **exFAT readahead patch:** moved to `board/common/patches/linux/0001`.
+- **`genimage.cfg`:** moved to `board/h616/`.
+- **Post-build:** the extlinux/LZ4/CMA checks moved to `board/h616/post-build.sh`. The
+  kernel-fragment check now fails instead of skipping when it cannot find the kernel `.config`.
+
+Re-applying the Zero3 and K2B defconfigs lost no lines.

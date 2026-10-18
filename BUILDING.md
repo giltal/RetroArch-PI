@@ -58,17 +58,23 @@ launcher and tools packages build from `$(BR2_EXTERNAL_RETROOPI_PATH)/../`.
 
 Each defconfig lists layers, most generic first:
 
+There are two families: `board/h616/` (Orange Pi Zero3, KickPi K2B: U-Boot,
+extlinux.conf, mainline + Armbian kernel) and `board/bcm2711/` (Raspberry Pi 4:
+VideoCore firmware boot, the Raspberry Pi kernel). The Pi 4's board layer is
+`board/rpi4/`.
+
 | Buildroot option | Layers |
 |---|---|
-| `BR2_ROOTFS_OVERLAY` | `board/common/rootfs_overlay`, then the board's (`extlinux.conf`) |
-| `BR2_GLOBAL_PATCH_DIR` | `board/common/patches`, `board/h616/patches`, the board's `patches` (applied in that order) |
-| `BR2_LINUX_KERNEL_CONFIG_FRAGMENT_FILES` | `board/h616/linux-retrogaming.config`, the board's `linux.config` |
-| post-build / post-image / genimage | `board/common/` |
+| `BR2_ROOTFS_OVERLAY` | `board/common/rootfs_overlay`, then the board's (H616: `extlinux.conf`; Pi 4: its own `/etc/fstab`) |
+| `BR2_GLOBAL_PATCH_DIR` | `board/common/patches`, the family's `patches`, the board's `patches` (applied in that order) |
+| `BR2_LINUX_KERNEL_CONFIG_FRAGMENT_FILES` | `board/common/linux-retrogaming.config`, the family's `linux-retrogaming.config`, the board's `linux.config` |
+| `BR2_ROOTFS_POST_BUILD_SCRIPT` | `board/common/post-build.sh` (shared invariants), then the family's `post-build.sh` (boot-chain checks) |
+| post-image | `board/common/post-image.sh` (exFAT ROM partition), then genimage with the family's or board's `genimage.cfg` (H616: `board/h616/`, Pi 4: `board/rpi4/`) |
 
 A new board needs: a defconfig (generate it from an existing one and change
-only the board lines), `board/<name>/` with its DT/U-Boot patches, kernel
-fragment and `extlinux.conf`, and an entry in `scripts/boards.sh`. A new SoC
-family adds a layer next to `board/h616/`.
+only the board lines), `board/<name>/` with its DT/boot files and kernel
+fragment, and an entry in `scripts/boards.sh`. A new SoC family adds a layer
+next to `board/h616/` and `board/bcm2711/`.
 
 ## What you must supply
 
@@ -87,7 +93,9 @@ family adds a layer next to `board/h616/`.
   stale paths and hard-fails on invariants. Add to it.
 - **The kernel version is tied to the vendored patches.** `board/h616/patches/linux/`
   is Armbian's set for exactly 6.18.53. Bump both together, and re-run the apply
-  test described in that directory's README.
+  test described in that directory's README. The Pi 4's kernel is a pinned
+  `raspberrypi/linux` commit (hash in `board/bcm2711/patches/linux/linux.hash`).
+  `board/common/patches/linux/` applies to both kernels.
 - **Patches live in two places:** `package/retroarch/libretro-*/` for cores,
   and `board/*/patches/<pkg>/` (`BR2_GLOBAL_PATCH_DIR`) for linux, U-Boot,
   mesa3d, bluez5_utils and fuse.

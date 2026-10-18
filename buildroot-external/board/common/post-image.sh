@@ -2,14 +2,14 @@
 #
 # Build the exFAT ROM partition image, then hand off to Buildroot's genimage.sh.
 #
-# The SD card gets two visible partitions:
-#   p1  ext4   rootfs (kernel, DTBs and extlinux live in /boot inside it)
-#   p2  exFAT  ROMs, mounted at /opt/roms -- readable/writable from Windows,
-#              so ROMs can be dropped straight onto the card
+# The ROM partition is the last one on every board's card (H616: p2, after
+# the rootfs; Pi 4: p4, after boot, rootfs and /data -- see the family's
+# genimage.cfg). exFAT, mounted at /opt/roms -- readable/writable from
+# Windows, so ROMs can be dropped straight onto the card.
 #
 # exFAT, not FAT32 (the reference's choice), at the user's request: no 4 GB file
 # limit (PSP/Dreamcast/PSX images), and it is what Windows formats large cards
-# as anyway. The kernel side was already in place (EXFAT_FS=y, 0052 readahead
+# as anyway. The kernel side was already in place (EXFAT_FS=y, the readahead
 # fix, fstab type "auto"), see the reference DevelopmentLog.
 #
 # The partition is created EMPTY. mtools, which pre-created the system folders
@@ -27,6 +27,8 @@ ROMS_IMG="${BINARIES_DIR}/roms.exfat"
 # their real capacity varies by brand from ~30.5e9 to ~32.0e9 bytes. The whole
 # image is 1 MiB (bootloader) + 1024 MiB (rootfs) + this, so 27648 MiB makes
 # a 28673 MiB (30.07e9 byte) image, which fits every 32 GB card seen so far.
+# (Pi 4: 4 MiB + 64 MiB boot + 1024 + 64 MiB /data + this = 28804 MiB,
+# 30.20e9 bytes, which still fits.)
 # Override for other cards, e.g. RETROOPI_ROMS_SIZE_MB=2048 for a small
 # dev image, or ~57000 for a 64 GB card.
 ROMS_SIZE_MB="${RETROOPI_ROMS_SIZE_MB:-27648}"

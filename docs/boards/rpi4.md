@@ -2,7 +2,8 @@
 
 > Third board, and the first outside the Allwinner family. Build name: `rpi4` (to be added to
 > `scripts/boards.sh`; work directory `~/rpi4`). History will go in `docs/log/rpi4.md`.
-> Status: **plan only**, written 2026-10-18. Nothing is built yet.
+> Status: **step 1 (skeleton) done** 2026-10-18: layers, defconfig, per-family shared files.
+> Not built yet. Log: `docs/log/rpi4.md`.
 
 The fundamentals stay the same as on the other boards: **the menu on HDMI within a few seconds of
 power-on**, and **nothing a power cut can break**. Everything below is judged against those two.
@@ -13,7 +14,7 @@ power-on**, and **nothing a power cut can break**. Everything below is judged ag
 
 | Topic | Decision |
 |---|---|
-| Kernel | **Raspberry Pi's fork** (`raspberrypi/linux`), as Buildroot's own `raspberrypi4_64_defconfig` uses. The firmware's DT overlays (vc4-kms-v3d, UART, gpio-shutdown) are written for it. It is not pinned to the Allwinner boards' 6.18.53 |
+| Kernel | **Raspberry Pi's fork** (`raspberrypi/linux`), as Buildroot's own `raspberrypi4_64_defconfig` uses. The firmware's DT overlays (vc4-kms-v3d, UART, gpio-shutdown) are written for it. Pinned: `rpi-6.18.y` @ `2341883` (6.18.57), the same series as the Allwinner boards' 6.18.53 |
 | Power-cut safety | **Read-only root filesystem**, as a shared change (all boards in the end). Writable state goes to a small journaled data partition |
 | Gamepad | PS3 pad over **USB** first. Onboard Bluetooth (BCM43455, mainline/RPi drivers exist) later. Note: the DS3 is classic Bluetooth, not BLE; the chip does both |
 | Hardware | 1 or 2 GB RAM (exact size still to confirm), fan/cooled case, Ethernet. **No serial adapter yet**: the K2B's (COM8) can move over, and should for bring-up |
@@ -96,7 +97,7 @@ measure it first, with a stopwatch and serial timestamps (`sertime.ps1` as on th
 
 ## Steps
 
-1. **Skeleton:** `scripts/boards.sh` entry, `rpi4_retro_defconfig` (from the Zero3's, board lines
+1. ~~**Skeleton:**~~ Done 2026-10-18. `scripts/boards.sh` entry, `rpi4_retro_defconfig` (from the Zero3's, board lines
    swapped: `BR2_cortex_a72`, rpi-firmware, the RPi kernel, Mesa `v3d` + `vc4`), the
    `board/bcm2711` and `board/rpi4` layers, the shared files made per-family as listed above. The
    Allwinner builds must stay byte-identical (check their `.config` and image contents).

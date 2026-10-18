@@ -14,7 +14,7 @@ init scripts, tools) is shared, so a fix made for one board reaches all of them.
 |---|---|---|---|
 | **Orange Pi Zero3** | Allwinner H618, 4× Cortex-A53, Mali-G31 MP2 | 2 GB LPDDR4 | **Working.** The reference board: every system and setting below was measured on it |
 | **KickPi K2B V2.2** | Allwinner H618, 4× Cortex-A53, Mali-G31 MP2 | 2 GB DDR3 | **Working.** Boots to the launcher; HDMI video and audio, GPU, Gigabit Ethernet, ROM card, power button (clean shutdown). Same SoC as the Zero3, so the emulation results carry over. DualShock 3 over Bluetooth not yet re-tested |
-| Raspberry Pi 4 | Broadcom BCM2711, V3D | | Planned |
+| Raspberry Pi 4 | Broadcom BCM2711, 4× Cortex-A72, V3D 4.2 | 1–8 GB | **In progress.** Board layer and defconfig written, not built yet; see [docs/boards/rpi4.md](docs/boards/rpi4.md) |
 
 **KickPi K2B: only the V2.2 is supported** (DDR3, Maxio MAE0621A Ethernet PHY).
 The V1 (LPDDR4, RTL8211F) needs a different U-Boot DRAM setup. eMMC is not
@@ -76,11 +76,13 @@ scripts/build.sh k2b          # KickPi K2B V2.2
 buildroot-external/
   configs/              one defconfig per board
   package/              shared: RetroArch + cores, launcher, tools
-  board/common/         shared: rootfs overlay, post-build/post-image, genimage
+  board/common/         shared: rootfs overlay, kernel fragment, post-build/post-image
   board/h616/           shared by the Allwinner H616/H618 boards: kernel patches,
-                        kernel and U-Boot fragments
+                        kernel and U-Boot fragments, genimage, boot-chain checks
+  board/bcm2711/        Raspberry Pi 4 family: kernel fragment, boot-chain checks
   board/opi-zero3/      Zero3 only: DT patches, extlinux.conf, PHY driver
   board/kickpi-k2b/     K2B only: DT + PHY patches, U-Boot (DDR3), extlinux.conf
+  board/rpi4/           Pi 4 only: config.txt, cmdline.txt, genimage, fstab
 launcher/               the launcher (C, DRM/KMS + SDL2_ttf)
 tools/                  volumed, inject-input, seed-credit, core-info
 scripts/                build.sh / board.sh <board>, boards.sh (the board table)

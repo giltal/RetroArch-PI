@@ -1,0 +1,41 @@
+# Raspberry Pi 4 firmware configuration (boot partition, p1). Read by the
+# VideoCore firmware (start4.elf) before the ARM cores start.
+# Reference: https://www.raspberrypi.com/documentation/computers/config_txt.html
+# board/bcm2711/post-build.sh checks the lines it depends on.
+
+# --- What to boot ---------------------------------------------------------
+arm_64bit=1
+start_file=start4.elf
+fixup_file=fixup4.dat
+# The plain arm64 Image for the first boot. A compressed kernel (the firmware
+# unpacks gzip) is a boot-time experiment for later, as LZ4 was on the H616.
+kernel=Image
+# Explicit, so the firmware never guesses (the built DTB is the only one on p1).
+device_tree=bcm2711-rpi-4-b.dtb
+# No initramfs: the root filesystem is mounted straight from the SD card.
+auto_initramfs=0
+
+# --- Display: KMS through vc4 + v3d ---------------------------------------
+# The Pi 4 variant explicitly, rather than relying on overlay_map.dtb to map
+# vc4-kms-v3d to it. cma-256: 256 MiB of CMA for the scanout buffers, as on
+# the H616 boards (cma=256M there); 1080p double buffering plus Mesa's needs.
+dtoverlay=vc4-kms-v3d-pi4,cma-256
+max_framebuffers=2
+disable_overscan=1
+
+# --- Fast boot ------------------------------------------------------------
+boot_delay=0
+disable_splash=1
+# Nothing to detect: no camera, no DSI display.
+camera_auto_detect=0
+display_auto_detect=0
+
+# --- CPU ------------------------------------------------------------------
+# 1.8 GHz on boards that support it (newer Pi 4 revisions); ignored otherwise.
+arm_boost=1
+
+# --- Serial console -------------------------------------------------------
+# GPIO14/15 (header pins 8 and 10), 3.3 V, 115200 8N1. With Bluetooth left on
+# the PL011, the header UART is the mini UART, ttyS0 (serial0); enable_uart
+# also locks the core clock so its baud rate stays right.
+enable_uart=1
