@@ -135,6 +135,15 @@ grep -q '^audio_driver = "alsathread"' "$racfg" \
 grep -q '^audio_device = "default"' "$racfg" \
 	|| fail "audio_device is not \"default\" -- volume would not reach games"
 
+# Save states. Without the bypass, RetroArch 1.19.1 refuses them on every core
+# ("Core does not support save states"), because no core info files ship; and
+# the states must be on the card, where the launcher looks for them and where
+# a read-only root does not get in the way. See retroarch.cfg.
+grep -q '^core_info_savestate_bypass = "true"' "$racfg" \
+	|| fail "core_info_savestate_bypass is not true -- save states would fail on every core"
+grep -q '^savestate_directory = "/opt/roms/_system/states"' "$racfg" \
+	|| fail "savestate_directory is not /opt/roms/_system/states (launcher.c STATES_DIR)"
+
 # The softvol control S11alsa creates must be the one the launcher and volumed
 # drive. softvol takes the name verbatim; the first image created 'Master'
 # while both programs asked for 'Master Playback Volume', so volume silently

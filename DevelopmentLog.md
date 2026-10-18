@@ -79,3 +79,50 @@ change:
   kernel-fragment check now fails instead of skipping when it cannot find the kernel `.config`.
 
 Re-applying the Zero3 and K2B defconfigs lost no lines.
+
+## 2026-10-18 — Save states never worked: "Core does not support save states" (all boards)
+
+The user reported it on every board. The Pi 4 log showed it for Game Boy (Gambatte), PSP
+(PPSSPP) and Dreamcast (Flycast).
+
+**The cause is RetroArch 1.19.1 with no core info files**, and this image ships none.
+- RetroArch decides save-state support per core from its `.info` file. For a core without one,
+  the core info cache (`~/.config/retroarch/cores/core_info.cache`, rzip-compressed JSON)
+  records `"savestate_support_level":0` (DISABLED) and `"has_info":false`. That held for
+  every core.
+- `task_save.c` checks only that level, so it refused before asking the core.
+- The comment in `core_info.c` ("assume all cores have full savestate support") applies only
+  when an info file exists.
+
+Ruled out on the way:
+- the save size: `retro_serialize_size()` of Flycast and PPSSPP return non-zero;
+- our RetroArch patches and the launcher;
+- RetroArch's stdin command interface for testing, which does not initialise here (as
+  `tools/inject-input.c` already says). Testing used uinput F2/F4 instead.
+
+**Second bug, found along the way:**
+- `savestate_directory` was never set, so RetroArch wrote states to
+  `/root/.config/retroarch/states/` on the rootfs.
+- The launcher's resume-from-slot looks in `/opt/roms/_system/states/<core>/`
+  (`launcher.c STATES_DIR`), so it could never have found a state.
+- And the root is to become read-only.
+
+**Fix** (shared `retroarch.cfg`, with post-build guards for both lines):
+- `core_info_savestate_bypass = "true"`;
+- `savestate_directory = "/opt/roms/_system/states"`. RetroArch adds the per-core folder
+  itself.
+
+**Verified on the Pi 4** with the shipped config: uinput F4 (load, nothing saved), F2 (save),
+F4 (load), state slot 9, test files removed.
+
+| Core | Load, nothing saved | Save | Load | On the card |
+|---|---|---|---|---|
+| Gambatte | "Failed to load state" (correct) | 26,704 B | OK | 5 KB |
+| PPSSPP (Burnout Legends) | same | 50.3 MB | OK | 12.0 MB |
+| Flycast (Sonic Adventure 2) | same | 36.4 MB | OK | 8.4 MB |
+
+**Left over:**
+- Pushed to the Pi only; the Zero3 and K2B were offline.
+- The test plan's "save, quit, resume from the launcher" is still to be checked by hand.
+- A PSP state is 12 MB written to exFAT, which has no journal: the power-cut work (rpi4 step 4)
+  should cover it.
