@@ -149,9 +149,13 @@ RETROARCH_POST_CONFIGURE_HOOKS += RETROARCH_FIX_DRM_INCLUDE
 # ran at 85%). For speed, RETROARCH_LOG_SPEED=1 turns on patch 0007:
 # "[Audio]: Speed: x%" every ~5 s, computed from how much emulated time the
 # core's audio covered per second of wall time.
+# MESA_SHADER_CACHE_DIR: Mesa caches compiled GPU shaders, by default under
+# $HOME/.cache on the rootfs, written whenever a 3D game compiles a new shader.
+# On the card instead, so play writes nothing to the rootfs (power cuts: see
+# DevelopmentLog 2026-10-19). Losing it costs only a recompile.
 define RETROARCH_INSTALL_WRAPPER
 	mv $(TARGET_DIR)/usr/bin/retroarch $(TARGET_DIR)/usr/bin/retroarch.bin
-	printf '#!/bin/sh\nexport HOME=/root\nexport RETROARCH_LOG_FPS=1\nexport RETROARCH_LOG_SPEED=1\nexec /usr/bin/retroarch.bin --verbose "$$@" 2>>/tmp/retroarch_verbose.log\n' > $(TARGET_DIR)/usr/bin/retroarch
+	printf '#!/bin/sh\nexport HOME=/root\nexport RETROARCH_LOG_FPS=1\nexport RETROARCH_LOG_SPEED=1\nexport MESA_SHADER_CACHE_DIR=/opt/roms/_system/cache/mesa\nexec /usr/bin/retroarch.bin --verbose "$$@" 2>>/tmp/retroarch_verbose.log\n' > $(TARGET_DIR)/usr/bin/retroarch
 	chmod +x $(TARGET_DIR)/usr/bin/retroarch
 endef
 RETROARCH_POST_INSTALL_TARGET_HOOKS += RETROARCH_INSTALL_WRAPPER

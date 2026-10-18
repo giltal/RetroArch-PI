@@ -8,6 +8,9 @@ Drop ROMs into the folder matching their system, e.g.:
 
 The launcher scans these folders on startup and hides any that are empty.
 _system holds favourites, recents, saved state and theme - leave it alone.
+_system\saves holds the games' own saves (one folder per emulator) and
+  _system\states the save states (PS + R / PS + L); copy them to back them up.
+  _system\cache can be deleted at any time (it is rebuilt).
 _system\bios is where BIOS files go (PlayStation: SCPH1001.BIN).
   Dreamcast (optional): _system\bios\dc\dc_boot.bin and dc_flash.bin.
   _system\bios\PPSSPP is created by the console itself - leave it alone.

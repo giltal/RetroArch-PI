@@ -7,7 +7,7 @@
 # So anything a newer image adds to the card layout is added here instead, at
 # boot, strictly ADDITIVELY: nothing on the card is ever deleted or renamed.
 #
-#  1. Every system folder the launcher knows, plus _system/{states,bios,bios/dc}
+#  1. Every system folder the launcher knows, plus _system/{states,saves,bios,bios/dc}
 #     and README.txt. The image's exFAT partition is created EMPTY (mtools
 #     cannot write exFAT; see post-image.sh), so on a freshly flashed card this
 #     is what lays the folders out, and on an older card it adds the systems
@@ -21,6 +21,10 @@
 #     and are copied across when the stamp shows a different version. The copy
 #     only adds or overwrites asset files, because PPSSPP keeps the user's PSP
 #     saves in the same tree (PPSSPP/PSP/SAVEDATA).
+#  3. In-game saves that images before 2026-10-19 wrote to the rootfs
+#     (/root/.config/retroarch/saves; RetroArch's savefile_directory is the
+#     card's _system/saves now). Copied across ONCE, never overwriting a file
+#     already on the card, and the rootfs copies are left where they are.
 #
 # The asset copy is backgrounded and detached: it is thousands of small files
 # on a FAT SD card, and the launcher should not wait for it. A PSP game started
@@ -37,6 +41,8 @@ SRC=/usr/share/ppsspp/PPSSPP
 DST=$ROMS/_system/bios/PPSSPP
 STAMP="$DST/.retroopi-assets"
 LOG=/var/log/ppsspp-assets.log
+OLDSAVES=/root/.config/retroarch/saves
+SAVESTAMP=$ROMS/_system/saves/.retroopi-copied-from-rootfs
 
 case "$1" in
 	start)
@@ -47,10 +53,35 @@ case "$1" in
 		for s in $SYSTEMS; do
 			[ -d "$ROMS/$s" ] || { mkdir -p "$ROMS/$s" && made="$made $s"; }
 		done
-		for s in _system/states _system/bios/dc; do
+		for s in _system/states _system/saves _system/bios/dc; do
 			[ -d "$ROMS/$s" ] || { mkdir -p "$ROMS/$s" && made="$made $s"; }
 		done
 		[ -n "$made" ] && printf "added folders:%s; " "$made"
+
+		# 3. Old in-game saves from the rootfs, once (stamp on the card).
+		# File by file, each only if the card lacks it. Not `cp -rn dir/. dest/`:
+		# BusyBox treats dest/. as an existing target, -n then skips ALL of it,
+		# and it still returns success (it copied nothing on the Pi 4).
+		if [ -d "$OLDSAVES" ] && [ ! -e "$SAVESTAMP" ]; then
+			n=0; bad=0
+			# A list file and `while read`, not `for f in $(find ...)`: names have
+			# spaces and [brackets], which word splitting and globbing would break.
+			# Redirected, not piped, so the loop runs in this shell and n/bad survive.
+			(cd "$OLDSAVES" && find . -type f) > /tmp/oldsaves.list
+			while IFS= read -r f; do
+				f=${f#./}
+				d="$ROMS/_system/saves/$f"
+				[ -e "$d" ] && continue
+				if mkdir -p "$(dirname "$d")" && cp "$OLDSAVES/$f" "$d"; then n=$((n + 1)); else bad=$((bad + 1)); fi
+			done < /tmp/oldsaves.list
+			rm -f /tmp/oldsaves.list
+			sync
+			if [ "$bad" -eq 0 ]; then
+				touch "$SAVESTAMP"; printf "copied %d old save files to _system/saves; " "$n"
+			else
+				printf "copying old saves: %d FAILED (will retry next boot); " "$bad"
+			fi
+		fi
 		[ -e "$ROMS/README.txt" ] || { cp "$README" "$ROMS/README.txt" && printf "added README.txt; "; }
 
 		if [ -d "$SRC" ]; then

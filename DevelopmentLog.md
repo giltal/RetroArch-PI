@@ -126,3 +126,67 @@ F4 (load), state slot 9, test files removed.
 - The test plan's "save, quit, resume from the launcher" is still to be checked by hand.
 - A PSP state is 12 MB written to exFAT, which has no journal: the power-cut work (rpi4 step 4)
   should cover it.
+
+## 2026-10-19 — Nothing written to the rootfs during play (all boards)
+
+The user asked whether the system is safe from power cuts without the read-only root (rpi4
+step 4). Game data loss is acceptable to them; the system must keep booting.
+
+**What was written at runtime.** Listed on the Pi 4 rootfs. It has no RTC, so runtime writes
+carry 1970 dates and image files 2026 dates; a first `-newer /etc/os-release` check found
+nothing because of that.
+- **In-game saves:** `savefile_directory` was never set, so `.srm`, PS1 memory cards and PSP
+  `SAVEDATA` went to `/root/.config/retroarch/saves/`.
+- `content_history.lpl` and `core_info.cache`, on every launch.
+- `asound.state` at shutdown; Bluetooth pairings; the dropbear host key (once); the seedrng
+  seed.
+
+**Assessment.**
+- The files a boot needs are never written at runtime: FAT p1 is unmounted, and the binaries
+  change only through `board.sh push`, atomically.
+- ext4's journal keeps the filesystem consistent.
+- The remaining risk is the SD card. A power cut while the card is writing can damage other
+  blocks it is moving internally, the usual way a Pi stops booting. So: no rootfs writes during
+  play.
+
+**Change** (shared `retroarch.cfg`, post-build guards for each line):
+- `savefile_directory = "/opt/roms/_system/saves"`;
+- `history_list_enable`, `core_info_cache_enable` and `content_runtime_log(_aggregate)` all
+  `false`.
+
+**Old saves:** S46card copies `/root/.config/retroarch/saves` to the card once, with `cp -rn`
+(never overwrites), leaves the rootfs copies in place, and stamps
+`_system/saves/.retroopi-copied-from-rootfs`.
+
+**Two bugs found on the Pi while testing:**
+- **`cp -rn "$OLDSAVES/." dest/` copied nothing and returned success.** BusyBox treats `dest/.`
+  as an existing target, and `-n` skips the whole tree. S46card now copies file by file from a
+  list file with `while read`, because names have spaces and [brackets]. It skips any file
+  already on the card, and stamps only when every copy succeeded.
+  - On the Pi: 8 files copied, all byte-identical (PS1 memory cards, CTR, PSP SAVEDATA,
+    Mario Kart 64, PC Engine).
+  - The first test session had already written a fresh Mario Kart save to the card. It was
+    deleted, so the user's real one was copied instead.
+- **Timestamp checks don't work on this clock.** It restarts at 1970 on every boot, so files
+  from a longer earlier boot look newer than a marker, and exFAT stores pre-1980 times as 1980.
+  The test now snapshots path, size and full mtime of the whole rootfs before and after a
+  session, and diffs them.
+
+**Mesa's shader cache** was the remaining writer during play (`/root/.cache/mesa_shader_cache`,
+new shaders in 3D games). The RetroArch wrapper now exports
+`MESA_SHADER_CACHE_DIR=/opt/roms/_system/cache/mesa`, and post-build checks it.
+
+**Verified on the Pi 4** (30 s sessions, rootfs snapshot diff):
+- Mario Kart 64: SRAM saved to `_system/saves/ParaLLEl N64/`, **0 rootfs changes**.
+- PSP Burnout Legends, with an empty cache: shaders compiled into the card's cache (12.5 MB,
+  43 files), **0 rootfs changes**.
+
+The card README now explains `_system/saves`, `states` and `cache`.
+
+What still writes the rootfs: `asound.state` (volume) at shutdown, Bluetooth pairing, the
+seedrng seed at boot, and `asound.conf` only when the sound card changes. All are small, and
+none happens during play; they are the rest of the read-only-root work.
+
+**Not yet done:** the Zero3 and K2B were offline. They get this with their next build, or with
+`board.sh push` of `retroarch.cfg`, `S46card`, `/usr/bin/retroarch` and `card-README.txt`,
+followed by a reboot so S46card copies their old saves across.

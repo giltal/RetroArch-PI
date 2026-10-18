@@ -106,7 +106,9 @@ measure it first, with a stopwatch and serial timestamps (`sertime.ps1` as on th
    defconfig line in `.config`.
 3. ~~**First boot**~~ Done 2026-10-18 (Game Boy with sound; GPU-heavy cores not yet tried)., writable root first: firmware → kernel → launcher on HDMI, Ethernet, SSH key
    login, HDMI audio, USB DS3, a game per GPU core (PSP, Dreamcast, N64).
-4. **Read-only root + `/data`** on the Pi 4, then power-cut tests: pull the plug during a game, a
+4. (Partly covered 2026-10-19, all boards: nothing is written to the rootfs during play any more,
+   saves/states/shader cache are on the card; see DevelopmentLog. The user parked the rest.)
+   **Read-only root + `/data`** on the Pi 4, then power-cut tests: pull the plug during a game, a
    save, a settings change and a boot; the next boot must be clean every time.
 5. **Boot-time pass:** first pass done 2026-10-18: 12 s → ~9.5 s by stopwatch (kernel to menu
    4.3 → 2.1 s; EEPROM bootloader updated). The ~7 s before Linux is parked: needs the firmware

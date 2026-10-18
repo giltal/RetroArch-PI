@@ -270,3 +270,18 @@ variant, original `config.txt` restored afterwards:
 - Or is part of the stopwatch time the TV? Nothing drives HDMI until vc4 starts at kernel
   ~0.3 s (no splash, no firmware picture), and the TV then needs its own time to lock on. To
   check: when does the first picture appear on a power-on?
+
+**The user's observation settles the TV question.** On a power-on nothing is displayed; the TV
+detects a signal at ~5 s, and the menu comes ~5 s later.
+- The TV is not syncing twice. Its preferred mode is CEA 1080p60 (148.5 MHz), the firmware's
+  `video=HDMI-A-1:1920x1080M@60` resolved to that same mode (`userdef`), and the launcher sets
+  it as well.
+- The firmware itself drives HDMI: `simple-framebuffer ... mode=1920x1080` comes before vc4.
+
+So the timeline is roughly:
+- 0–5 s: bootloader + firmware start, then the firmware's HDMI init (the TV's "signal");
+- 5–7.4 s: firmware loads the kernel, DTB and overlays;
+- 7.4–9.5 s: Linux to the menu.
+
+The ~7.4 s is firmware time, before and after its HDMI step. The serial log
+(`uart_2ndstage=1`) is what will show where it goes.

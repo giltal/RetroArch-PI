@@ -143,6 +143,14 @@ grep -q '^core_info_savestate_bypass = "true"' "$racfg" \
 	|| fail "core_info_savestate_bypass is not true -- save states would fail on every core"
 grep -q '^savestate_directory = "/opt/roms/_system/states"' "$racfg" \
 	|| fail "savestate_directory is not /opt/roms/_system/states (launcher.c STATES_DIR)"
+# Nothing written to the rootfs during play (power-cut exposure of the SD card).
+grep -q '^savefile_directory = "/opt/roms/_system/saves"' "$racfg" \
+	|| fail "savefile_directory is not /opt/roms/_system/saves -- in-game saves would go to the rootfs"
+for kv in 'history_list_enable = "false"' 'core_info_cache_enable = "false"' 'content_runtime_log = "false"'; do
+	grep -qxF "$kv" "$racfg" || fail "retroarch.cfg lacks: $kv -- RetroArch would write the rootfs on every launch"
+done
+grep -q 'MESA_SHADER_CACHE_DIR=/opt/roms/' "$TARGET_DIR/usr/bin/retroarch" \
+	|| fail "/usr/bin/retroarch does not move Mesa's shader cache to the card -- 3D games would write the rootfs"
 
 # The softvol control S11alsa creates must be the one the launcher and volumed
 # drive. softvol takes the name verbatim; the first image created 'Master'
