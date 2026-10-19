@@ -190,3 +190,53 @@ none happens during play; they are the rest of the read-only-root work.
 **Not yet done:** the Zero3 and K2B were offline. They get this with their next build, or with
 `board.sh push` of `retroarch.cfg`, `S46card`, `/usr/bin/retroarch` and `card-README.txt`,
 followed by a reboot so S46card copies their old saves across.
+
+## 2026-10-19 — Game tests: real gameplay, a virtual pad, screenshots and sound level
+
+The user asked for a more accurate release test. Their design: each test starts from a slot-10
+save state they make in real gameplay, and they give the inputs, e.g. Sega Rally 2:
+`R2 5 s, R2 + RIGHT 0.5 s, R2 5 s` (R2, the DS3's analog trigger, is the accelerator).
+
+**Pieces:**
+- **`tools/inject-pad.c`:** a uinput gamepad with the DS3's USB IDs (054c:0268), buttons and
+  six axes (sticks; Z/RZ = analog L2/R2). RetroArch maps it with the shipped PS3 autoconfig.
+  It is named "RetroArch-PI Test Pad". Steps are `INPUTS:SECONDS`, with analog `R2=60`,
+  `LX=-50`. Each step is logged with a monotonic timestamp.
+- **RetroArch 0009:**
+  - `SIGUSR1` takes a screenshot (flag in the signal handler, `CMD_EVENT_TAKE_SCREENSHOT` on
+    the main thread);
+  - the speed line now also reports the level of what the core produced:
+    `level rms -12.7 peak 0.0 dBFS`.
+- **`scripts/game-tests.txt`, `game-test-board.sh`, `game-test.sh`, `png-stats.py`:**
+  pure-Python PNG stats (mean, std, frame-to-frame diff on a 64x36 grid), so nothing needs to
+  be installed on the build host.
+
+**Wrong turns:**
+- **`retroarch -e 10`** (load an entry state) did nothing for Flycast: no `[State]` line at
+  all. It loads at content load, and Flycast loads its own disc ("Content loading skipped") and
+  cannot take a state before its first frame. Slot 10 is now loaded the way a player does it:
+  `state_slot = 10` in the test config, and the pad presses **PS + L1**.
+- **Reserving player 1 by name** (`input_player1_reserved_device = "RetroArch-PI Test Pad"`,
+  type 2) did not take: the user's DS3 kept port 1, so the test pad's input went to player 2.
+  Now `input_player1_joypad_index` = the number of joysticks present before the pad is
+  created (its index), and player 2 = 0.
+- The last screenshot was cut off ("not a PNG"): wait 3 s after it before stopping RetroArch.
+- Screenshot names carry the game title, with spaces: png-stats prints the path last, and
+  game-test.sh passes the names as an array.
+
+**First real run, Sega Rally 2 on the Pi 4: PASS.**
+- State loaded (36 MB), speed 99.9% during the sequence, sound -10 to -13 dBFS RMS.
+- Four screenshots, all different: the start straight at 17 mph at 1.5 s; at 10.9 s, 25 mph
+  and off the road against the fence (the 0.5 s right steer at the first bend). The pad
+  really drives.
+
+**Also found:**
+- **R2 is digital in our PS3 autoconfig** (`input_r2_btn = "7"`, no `input_r2_axis`). Games
+  get full throttle or none. Mapping ABS_RZ/ABS_Z as analog triggers is a separate
+  improvement; the virtual pad can test it.
+- **Core `.opt` files are rewritten once per core.** RetroArch writes the full option set on a
+  core's first launch, because our shipped files hold only the tuned keys (PCSX 15 → 59,
+  PPSSPP 6 → 76), and it creates one for cores we ship none for. All shipped values survive.
+  After that the file is complete: a Flycast session snapshot shows 0 rootfs changes, despite
+  the "Saved core options file" log line. A one-time write per core on a fresh image. Shipping
+  complete `.opt` files would remove it.

@@ -1,0 +1,20 @@
+# Game tests: scripts/game-test.sh <board> [name-filter]
+#
+# Each test starts from a save state in SLOT 10 that the user made at a real
+# gameplay moment (in the game: PS + triangle -> State Slot 10 -> Save State),
+# then a virtual DualShock 3 (tools/inject-pad.c) plays the sequence while the
+# test takes a screenshot every 2 s and reads the audio meter. See
+# docs/test-plan.md, "Game tests".
+#
+# system | core | rom (file under /opt/roms/<system>, or a folder holding a
+#          .gdi/.cue/.m3u) | settle seconds (load + state) | sequence
+#
+# Sequence: inject-pad steps, INPUTS:SECONDS, INPUTS = NAME[+NAME...] | WAIT
+#   CROSS CIRCLE TRIANGLE SQUARE L1 R1 L2 R2 SELECT START PS L3 R3 UP DOWN LEFT RIGHT
+#   L2=PCT R2=PCT (analog trigger 0..100), LX= LY= RX= RY= (stick -100..100)
+#
+# A game whose slot-10 state is not on the board's card is reported as SKIP,
+# so the list can be shared between boards.
+
+# Dreamcast: R2 is the accelerator (user, 2026-10-19).
+dreamcast|flycast_libretro.so|Sega Rally 2 (USA).chd|10|R2:5 R2+RIGHT:0.5 R2:5

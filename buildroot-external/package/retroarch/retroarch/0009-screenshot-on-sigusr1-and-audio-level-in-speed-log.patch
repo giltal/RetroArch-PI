@@ -1,0 +1,165 @@
+From: RetroArch-PI
+Subject: [PATCH] screenshot on SIGUSR1; audio level in the speed log
+
+For automated game tests (scripts/game-test.sh):
+
+- runloop: SIGUSR1 sets a flag; the next runloop iteration takes a
+  screenshot exactly as the "take screenshot" hotkey does (the rendered
+  frame, read back from the GPU with shaders applied). The test's virtual
+  pad holds buttons while it plays, so pressing the PS-modifier hotkey for
+  a screenshot would disturb the game.
+- audio: the RETROARCH_LOG_SPEED line (patch 0007) also reports the RMS
+  and peak level of what the core produced in that window, before the
+  volume control, so a test can tell sound from silence.
+
+---
+--- a/audio/audio_driver.c
++++ b/audio/audio_driver.c
+@@ -824,14 +824,23 @@
+  *   [Audio]: Speed:  98.7% (core audio 4.94 s in 5.00 s wall)
+  * A window during which the menu was open or the core produced no audio
+  * reads low; ignore those.
++ *
++ * RetroArch-PI (patch 0009): the same line also gives the level of what the
++ * core produced in that window, before the volume control, so a test can
++ * tell real sound from silence:
++ *   [Audio]: Speed:  98.7% (core audio 4.94 s in 5.00 s wall) level rms -21.4 peak -3.1 dBFS
++ * Digital silence reads -inf (printed as -99.0).
+  */
+-static void audio_driver_log_speed(size_t frames)
++static void audio_driver_log_speed(const int16_t *data, size_t frames)
+ {
+    static int      enabled = -1;
+    static retro_time_t t0;
+    static uint64_t acc;
+    static unsigned since_check;
++   static double   sumsq;
++   static int      peak;
+    retro_time_t    now;
++   size_t          i;
+ 
+    if (enabled < 0)
+    {
+@@ -841,6 +850,14 @@
+    if (!enabled)
+       return;
+ 
++   for (i = 0; i < frames * 2; i++)      /* interleaved stereo */
++   {
++      int s = data[i] < 0 ? -(int)data[i] : data[i];
++      sumsq += (double)data[i] * (double)data[i];
++      if (s > peak)
++         peak = s;
++   }
++
+    acc         += frames;
+    since_check += (unsigned)frames;
+    if (since_check < 1024)      /* read the clock ~every 20 ms, not per sample */
+@@ -852,11 +869,17 @@
+    {
+       double rate = video_state_get_ptr()->av_info.timing.sample_rate;
+       double wall = (double)(now - t0) / 1000000.0;
++      double rms  = acc ? sqrt(sumsq / (double)(acc * 2)) : 0.0;
++      double rmsd = rms  > 0.0 ? 20.0 * log10(rms / 32768.0) : -99.0;
++      double pkd  = peak > 0   ? 20.0 * log10((double)peak / 32768.0) : -99.0;
+       if (rate > 0.0)
+-         RARCH_LOG("[Audio]: Speed: %5.1f%% (core audio %.2f s in %.2f s wall)\n",
+-               100.0 * (double)acc / rate / wall, (double)acc / rate, wall);
+-      acc = 0;
+-      t0  = now;
++         RARCH_LOG("[Audio]: Speed: %5.1f%% (core audio %.2f s in %.2f s wall) level rms %.1f peak %.1f dBFS\n",
++               100.0 * (double)acc / rate / wall, (double)acc / rate, wall,
++               rmsd < -99.0 ? -99.0 : rmsd, pkd);
++      acc   = 0;
++      sumsq = 0.0;
++      peak  = 0;
++      t0    = now;
+    }
+ }
+ 
+@@ -867,7 +890,12 @@
+    recording_state_t *recording_st = NULL;
+    if (audio_st->flags & AUDIO_FLAG_SUSPENDED)
+       return;
+-   audio_driver_log_speed(1);
++   {
++      int16_t lr[2];
++      lr[0] = left;
++      lr[1] = right;
++      audio_driver_log_speed(lr, 1);
++   }
+    audio_st->output_samples_conv_buf[audio_st->data_ptr++] = left;
+    audio_st->output_samples_conv_buf[audio_st->data_ptr++] = right;
+ 
+@@ -913,7 +941,7 @@
+    if ((audio_st->flags & AUDIO_FLAG_SUSPENDED) || (frames < 1))
+       return frames;
+ 
+-   audio_driver_log_speed(frames);
++   audio_driver_log_speed(data, frames);
+ 
+    runloop_flags                   = runloop_get_flags();
+ 
+--- a/runloop.c
++++ b/runloop.c
+@@ -6827,6 +6827,48 @@
+  * button input in order to wake up the loop,
+  * -1 if we forcibly quit out of the RetroArch iteration loop.
+  **/
++/*
++ * Screenshot on SIGUSR1 (RetroArch-PI, for automated game tests).
++ *
++ * `kill -USR1 <retroarch pid>` makes the next runloop iteration take a
++ * screenshot exactly as the "take screenshot" hotkey does: the rendered frame,
++ * read back from the GPU with shaders applied, saved as a PNG in
++ * screenshot_directory. A test needs this while its virtual pad is holding
++ * buttons, when pressing the PS modifier for the hotkey would disturb the
++ * game. The handler only sets a flag; the work happens on the main thread.
++ */
++#if (defined(__linux__) || defined(__unix__)) && !defined(EMSCRIPTEN)
++static volatile sig_atomic_t retroopi_screenshot_requested = 0;
++
++static void retroopi_sigusr1(int sig)
++{
++   (void)sig;
++   retroopi_screenshot_requested = 1;
++}
++
++static void retroopi_take_requested_screenshot(void)
++{
++   static bool installed = false;
++   if (!installed)
++   {
++      struct sigaction sa;
++      memset(&sa, 0, sizeof(sa));
++      sa.sa_handler = retroopi_sigusr1;
++      sigemptyset(&sa.sa_mask);
++      sa.sa_flags   = SA_RESTART;
++      sigaction(SIGUSR1, &sa, NULL);
++      installed     = true;
++   }
++   if (retroopi_screenshot_requested)
++   {
++      retroopi_screenshot_requested = 0;
++      command_event(CMD_EVENT_TAKE_SCREENSHOT, NULL);
++   }
++}
++#else
++static void retroopi_take_requested_screenshot(void) { }
++#endif
++
+ int runloop_iterate(void)
+ {
+    int i;
+@@ -6864,7 +6906,11 @@
+    bool audio_sync                              = settings->bools.audio_sync;
+ #ifdef HAVE_DISCORD
+    discord_state_t *discord_st                  = discord_state_get_ptr();
++#endif
++
++   retroopi_take_requested_screenshot();
+ 
++#ifdef HAVE_DISCORD
+    if (discord_st->inited)
+    {
+       Discord_RunCallbacks();

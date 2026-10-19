@@ -11,7 +11,7 @@ RETROOPI_TOOLS_SITE = $(BR2_EXTERNAL_RETROOPI_PATH)/../tools
 RETROOPI_TOOLS_SITE_METHOD = local
 RETROOPI_TOOLS_LICENSE = GPL-2.0
 
-RETROOPI_TOOLS_PROGS = inject-input seed-credit volumed core-info
+RETROOPI_TOOLS_PROGS = inject-input inject-pad seed-credit volumed core-info
 
 # -ldl for core-info's dlopen(); harmless for the others (glibc 2.34+ has it
 # in libc anyway).

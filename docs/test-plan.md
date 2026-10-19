@@ -50,6 +50,39 @@ The launcher is stopped during the run and the TV shows each game in turn.
   regression check: compare each run with the board's previous results below,
   and investigate any game that changed verdict or dropped by more than ~5%.
 
+## 1b. Game tests: real gameplay with a virtual pad
+
+```bash
+wsl bash /mnt/c/RetroArch_PI/scripts/game-test.sh <board> [name-filter]
+```
+
+The sweep above measures title screens and attract demos, which run at full
+speed anyway. The game tests play the hard part of each game:
+
+- **Start point:** a save state in **slot 10** that the user made at a real
+  gameplay moment (in the game: PS + triangle → State Slot → 10 → Save
+  State). States are per card, so each board's card needs its own; a game
+  without one is SKIP.
+- **Input:** a virtual DualShock 3 (`tools/inject-pad.c`, a uinput pad with the
+  DS3's IDs, named "RetroArch-PI Test Pad") becomes player 1, with the user's
+  own DS3 moved to player 2. It loads slot 10 with PS + L1, waits 3 s, then
+  plays the game's sequence from `scripts/game-tests.txt`, e.g.
+  `R2:5 R2+RIGHT:0.5 R2:5` (hold R2 5 s, R2 + right 0.5 s, R2 5 s). Triggers and
+  sticks are analog (`R2=60`, `LX=-50`).
+- **Checks:** a screenshot every 2 s (RetroArch patch 0009: `kill -USR1`
+  takes one, without touching input), the audio meter (patch 0007: speed,
+  and 0009: level), the state load and the process.
+
+| Verdict | When |
+|---|---|
+| FAIL | RetroArch exited; slot 10 did not load; every screenshot black; the picture never changed; speed mean < 80%; digital silence |
+| WARN | speed 80–95%; some black or unchanged screenshots; very quiet sound (RMS < -60 dBFS) |
+| PASS | everything else |
+
+Results, screenshots and logs: `<work>/game-tests/<date-time>/`. Look at the
+screenshots of anything that is not PASS; a sequence that drives the car into
+a wall still tests the emulator, but a better one tests more.
+
 ## 2. Manual checklist
 
 | Check | How | Expected |
