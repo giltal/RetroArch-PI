@@ -285,3 +285,29 @@ So the timeline is roughly:
 
 The ~7.4 s is firmware time, before and after its HDMI step. The serial log
 (`uart_2ndstage=1`) is what will show where it goes.
+
+## 2026-10-19 — The TV locked twice on every boot: the firmware off HDMI
+
+The user saw two phases: a signal at ~5 s, then the TV locking again before the menu appeared.
+
+**Counted with one `drm.debug=0x14` boot** (`cmdline.txt` restored afterwards). Three things
+touch HDMI:
+
+| When | Who | What |
+|---|---|---|
+| ~5 s after power-on | VideoCore firmware | starts HDMI (`simple-framebuffer 1920x1080`, black because the splash is off): **lock 1** |
+| kernel 0.35 s | vc4 | evicts simplefb, then "mode changed", "modeset on [ENCODER:34:TMDS-34]": a **full modeset**, HDMI restarts, **lock 2** |
+| kernel ~1.5 s | launcher | same mode, "keeps [ENCODER:34:TMDS-34]": no modeset |
+
+The launcher is not the cause. vc4 does not take over the firmware's HDMI seamlessly.
+
+**Fix: `hdmi_ignore_hotplug=1` in `config.txt`.** The firmware behaves as if no screen is
+attached and leaves HDMI dark; vc4 detects the TV itself.
+- No simplefb, and no firmware `video=` on the command line.
+- vc4 initialised at **0.17 s** (was 0.30 s, without the simplefb handover).
+- HDMI at 1080p, launcher and sound card OK.
+- The firmware stage itself did not get shorter (remote reboot timing 11.4–12.5 s, as before).
+- **User-verified on the TV: it locks once.**
+- bcm2711 post-build now fails without the line.
+- Installed with `board.sh kernel`. Image.gz is small enough that the previous set now stays
+  as `*.prev` on p1.

@@ -22,6 +22,18 @@ auto_initramfs=0
 dtoverlay=vc4-kms-v3d-pi4,cma-256
 max_framebuffers=2
 disable_overscan=1
+# The firmware leaves HDMI alone; the kernel's vc4 driver is the only thing
+# that turns it on. Without this the TV locked TWICE on every boot: the
+# firmware started HDMI (~5 s after power-on, a black screen since the splash
+# is off), then vc4 took over at kernel 0.35 s with a full modeset (drm.debug:
+# "modeset on [ENCODER:34:TMDS-34]"), restarting HDMI, and the TV searched for
+# the signal again while the menu was already being drawn. The launcher adds no
+# modeset of its own (same mode: "keeps [ENCODER...]"). With the firmware off
+# HDMI: no simple-framebuffer, vc4 up at 0.17 s instead of 0.30 s, one lock
+# (user-verified, 2026-10-19). vc4 detects the TV itself; the firmware's
+# video= on the kernel command line goes away too, and the launcher picks the
+# mode as it does on the H616 boards.
+hdmi_ignore_hotplug=1
 
 # --- Fast boot ------------------------------------------------------------
 boot_delay=0

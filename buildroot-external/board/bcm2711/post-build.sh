@@ -35,6 +35,10 @@ grep -q '^dtoverlay=vc4-kms-v3d-pi4' "$cfg" \
 # is the overlay's cma- parameter.
 grep -q '^dtoverlay=vc4-kms-v3d-pi4.*,cma-[0-9]' "$cfg" \
 	|| fail "config.txt: vc4-kms-v3d-pi4 has no cma- parameter -- 1080p scanout buffers will not fit"
+# Only vc4 may turn HDMI on: if the firmware does too, the TV locks twice per
+# boot (see config.txt).
+grep -q '^hdmi_ignore_hotplug=1' "$cfg" \
+	|| fail "config.txt lacks hdmi_ignore_hotplug=1 -- the TV would lock twice on every boot"
 # The kernel and DTB config.txt names must be the ones genimage puts on p1.
 k=$(sed -n 's/^kernel=//p' "$cfg")
 [ -n "$k" ] && [ -s "$BINARIES_DIR/$k" ] \
