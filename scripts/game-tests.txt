@@ -21,3 +21,7 @@ dreamcast|flycast_libretro.so|Sega Rally 2 (USA).chd|10|R2:5 R2+RIGHT:0.5 R2:5
 # N64: Cross = the N64's A (accelerate); "L" in the user's sequence is a left
 # steer, i.e. the analog stick (the d-pad is the N64's own d-pad).
 n64|paralleln64_libretro.so|Mario Kart 64 (USA).z64|8|CROSS:10 CROSS+LX=-100:0.5 CROSS:1 CROSS+LX=-100:0.5 CROSS:3
+# PlayStation: Cross accelerates, the d-pad steers. The US release (no
+# LibCrypt; the European one froze mid-game without its .sbi), started through
+# its .m3u as the launcher does.
+psx|pcsx_rearmed_libretro.so|CTR - Crash Team Racing (USA).m3u|8|CROSS:10 CROSS+LEFT:0.5 CROSS:5
