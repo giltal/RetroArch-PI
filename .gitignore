@@ -18,3 +18,9 @@ backup/
 
 # Cover art fetched by scripts/fetch-thumbnails.py (publishers' artwork, never committed)
 scripts/thumbnails-cache/
+
+# Slot-10 save states, the game tests' start points (scripts/game-test.sh),
+# copied from the boards' cards: game memory snapshots of the user's games,
+# 1-12 MB each (compressed). Kept here to restore or copy to another card,
+# never committed. scripts/fetch-test-states.sh <board> fills it.
+test-states/

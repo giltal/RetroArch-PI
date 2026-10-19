@@ -79,6 +79,10 @@ speed anyway. The game tests play the hard part of each game:
 | WARN | speed 80–95%; some black or unchanged screenshots; very quiet sound (RMS < -60 dBFS); a LibCrypt PS1 disc without its `.sbi` (it would freeze later; also flagged by the sweep in part 1) |
 | PASS | everything else |
 
+Back up the slot-10 states with `scripts/fetch-test-states.sh <board>`: it copies
+them into the git-ignored `test-states/<board>/<core>/` (md5-checked), in the
+card's layout, ready to copy onto another card's `_system/states/`.
+
 Results, screenshots and logs: `<work>/game-tests/<date-time>/`. Look at the
 screenshots of anything that is not PASS; a sequence that drives the car into
 a wall still tests the emulator, but a better one tests more.
