@@ -311,3 +311,5 @@ attached and leaves HDMI dark; vc4 detects the TV itself.
 - bcm2711 post-build now fails without the line.
 - Installed with `board.sh kernel`. Image.gz is small enough that the previous set now stays
   as `*.prev` on p1.
+
+**Stopwatch after the fix: 9 s** power-on to menu (user), was ~9.5 s, with one HDMI lock instead of two.
