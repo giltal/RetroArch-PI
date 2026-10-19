@@ -18,3 +18,6 @@
 
 # Dreamcast: R2 is the accelerator (user, 2026-10-19).
 dreamcast|flycast_libretro.so|Sega Rally 2 (USA).chd|10|R2:5 R2+RIGHT:0.5 R2:5
+# N64: Cross = the N64's A (accelerate); "L" in the user's sequence is a left
+# steer, i.e. the analog stick (the d-pad is the N64's own d-pad).
+n64|paralleln64_libretro.so|Mario Kart 64 (USA).z64|8|CROSS:10 CROSS+LX=-100:0.5 CROSS:1 CROSS+LX=-100:0.5 CROSS:3
