@@ -25,3 +25,5 @@ n64|paralleln64_libretro.so|Mario Kart 64 (USA).z64|8|CROSS:10 CROSS+LX=-100:0.5
 # LibCrypt; the European one froze mid-game without its .sbi), started through
 # its .m3u as the launcher does.
 psx|pcsx_rearmed_libretro.so|CTR - Crash Team Racing (USA).m3u|8|CROSS:10 CROSS+LEFT:0.5 CROSS:5
+# PSP: Cross (the PSP's X) accelerates. PPSSPP loads slower: 12 s settle.
+psp|ppsspp_libretro.so|Burnout Legends (USA) (En,Fr,De,Es,It,Nl) (v2.00).iso|12|CROSS:15
