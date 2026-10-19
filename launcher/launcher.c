@@ -118,6 +118,11 @@ static void startup_mark(const char *stage)
 #define RETROARCH_BIN   "/usr/bin/retroarch"
 #define STATES_DIR      "/opt/roms/_system/states"
 #define MAX_SLOTS       10  /* Save state slots 0-9 */
+/* Quick start: START in a game list launches from this slot. Outside the
+ * picker's 0-9 on purpose: the user saves it from RetroArch's menu (State
+ * Slot 10 -> Save State) as a "start here" bookmark, and the game tests
+ * (scripts/game-test.sh) start from the same state. */
+#define QUICK_SLOT      10
 #define FONT_PATH       "/usr/share/fonts/launcher.ttf"
 #define FONT_SIZE_LIST  UI_SCALE(22)
 #define FONT_SIZE_HEADER UI_SCALE(26)
@@ -2596,6 +2601,18 @@ static char menu_entry_initial(int idx)
 static int  g_jump_hint_frames = 0;
 static char g_jump_hint_char   = 0;
 
+/* A short centred message (e.g. START on a game with no quick-start save),
+ * drawn and expired exactly like the letter-jump hint. */
+#define MSG_FRAMES 60               /* ~2 s at the loop's ~30 fps */
+static int  g_msg_frames = 0;
+static char g_msg_text[96];
+
+static void msg_show(const char *text)
+{
+    snprintf(g_msg_text, sizeof(g_msg_text), "%s", text);
+    g_msg_frames = MSG_FRAMES;
+}
+
 static bool menu_jump_letter(int dir)
 {
     if (g_menu.count <= 0)
@@ -2885,7 +2902,15 @@ static void ui_draw_footer(void)
         gfx_fill_rect(x, y, UI_SCALE(20), UI_SCALE(20), COL_HEADER_BG);
         gfx_draw_text(g_font_small, "\xe2\x96\xa1", x + UI_SCALE(3), y + UI_SCALE(2), COL_TEXT, 0);
         x += UI_SCALE(26);
-        gfx_draw_text(g_font_small, "SRC", x, y + UI_SCALE(2), COL_TEXT_DIM, 0);
+        x += gfx_draw_text(g_font_small, "SRC", x, y + UI_SCALE(2), COL_TEXT_DIM, 0);
+        /* START = quick start from slot 10 (the ▶ marker in the list) */
+        x += UI_SCALE(20);
+        int sw;
+        TTF_SizeUTF8(g_font_small, "START", &sw, NULL);
+        gfx_fill_rect(x, y, sw + UI_SCALE(10), UI_SCALE(20), COL_HEADER_BG);
+        gfx_draw_text(g_font_small, "START", x + UI_SCALE(5), y + UI_SCALE(2), COL_TEXT, 0);
+        x += sw + UI_SCALE(16);
+        gfx_draw_text(g_font_small, "QUICK \xe2\x96\xb6", x, y + UI_SCALE(2), COL_TEXT_DIM, 0);
     }
 
     /* Page indicator on right side (for all list modes) */
@@ -3110,6 +3135,23 @@ static void marquee_frame(void)
     drm_flip();
 }
 
+static void build_state_path(char *out, int out_size,
+                             const char *rom_path, const char *core_file,
+                             int slot);
+
+/* Does this ROM have a quick-start (slot QUICK_SLOT) save state? Checked for
+ * the visible rows at each redraw (a dozen lookups, only when something
+ * changed), so a state saved in a game shows up as soon as the list returns. */
+static bool quick_state_exists(const MenuEntry *e)
+{
+    char path[MAX_NAME];
+    if (e->system_idx < 0 || !e->path[0])
+        return false;
+    build_state_path(path, sizeof(path), e->path,
+                     g_systems[e->system_idx].core_file, QUICK_SLOT);
+    return path[0] && access(path, F_OK) == 0;
+}
+
 /* Settings items' icons, in SettingItem order. */
 static const char *setting_icons[SETTING_COUNT] = {
     "theme", "volume", "favorites", "recents", "clearrecent", "restart", "poweroff",
@@ -3137,11 +3179,12 @@ static void ui_draw_list(void)
         int text_max_w = list_w - 2 * PADDING_X - UI_SCALE(8);
 
         /* Reserve space for star icon on ROM entries */
-        bool show_star = (g_menu.mode == MENU_ROMS || g_menu.mode == MENU_FAVORITES ||
-                          g_menu.mode == MENU_RECENTS) && e->is_favorite;
-        if (g_menu.mode == MENU_ROMS || g_menu.mode == MENU_FAVORITES ||
-            g_menu.mode == MENU_RECENTS)
-            text_max_w -= UI_SCALE(30); /* Space for star */
+        bool rom_list = g_menu.mode == MENU_ROMS || g_menu.mode == MENU_FAVORITES ||
+                        g_menu.mode == MENU_RECENTS;
+        bool show_star  = rom_list && e->is_favorite;
+        bool show_quick = rom_list && quick_state_exists(e);
+        if (rom_list)
+            text_max_w -= UI_SCALE(30) + UI_SCALE(28); /* Space for star + quick marker */
 
         if (idx == g_menu.selected) {
             /* Highlighted selection pill */
@@ -3184,6 +3227,16 @@ static void ui_draw_list(void)
             gfx_draw_star(list_w - PADDING_X - UI_SCALE(12),
                           text_y + FONT_SIZE_LIST / 2 + 1,
                           UI_SCALE(9), UI_SCALE(4), COL_STAR);
+        }
+        /* Quick-start marker, left of the star's column: this game has a
+         * slot-10 save, START launches it from there. */
+        if (show_quick) {
+            const char *mark = "\xe2\x96\xb6";      /* U+25B6 play triangle */
+            int mw = 0, mh = 0;
+            TTF_SizeUTF8(g_font_small, mark, &mw, &mh);
+            gfx_draw_text(g_font_small, mark,
+                          list_w - PADDING_X - UI_SCALE(30) - mw,
+                          text_y + (FONT_SIZE_LIST - mh) / 2 + 1, COL_SYSTEM_ICON, 0);
         }
 
         /* Settings mode: show current value on the right */
@@ -3265,6 +3318,21 @@ static void ui_draw_jump_hint(void)
     gfx_draw_text_centered(g_font_jump, s, by + pad, COL_SYSTEM_ICON);
 }
 
+/* The short centred message (msg_show), as a solid panel like the jump hint. */
+static void ui_draw_msg(void)
+{
+    if (g_msg_frames <= 0 || !g_msg_text[0])
+        return;
+    int tw = 0, th = 0;
+    TTF_SizeUTF8(g_font_list, g_msg_text, &tw, &th);
+    int pad = UI_SCALE(20);
+    int bw  = tw + pad * 2;
+    int bh  = th + pad * 2;
+    int by  = (SCREEN_HEIGHT - bh) / 2;
+    gfx_fill_rect((SCREEN_WIDTH - bw) / 2, by, bw, bh, COL_HEADER_BG);
+    gfx_draw_text_centered(g_font_list, g_msg_text, by + pad, COL_TEXT);
+}
+
 static void ui_draw(void)
 {
     gfx_clear(COL_BG);
@@ -3282,6 +3350,7 @@ static void ui_draw(void)
     ui_draw_preview();
     ui_draw_footer();
     ui_draw_jump_hint();
+    ui_draw_msg();
 
     drm_flip();
     g_marquee.sync = true;         /* the other buffer still has the previous frame */
@@ -3927,7 +3996,11 @@ static void launch_game(const char *rom_path, int system_idx, int state_slot)
             FILE *fc = fopen(tmp_cfg, "w");
             if (fc) {
                 fprintf(fc, "savestate_auto_load = \"true\"\n");
-                fprintf(fc, "state_slot = \"%d\"\n", state_slot);
+                /* A quick start loads slot 10 but saves (PS + R) go to slot
+                 * 0 as usual: slot 10 is a bookmark (and the game tests'
+                 * start point), changed only on purpose from the menu. */
+                fprintf(fc, "state_slot = \"%d\"\n",
+                        state_slot == QUICK_SLOT ? 0 : state_slot);
                 fclose(fc);
             }
             execl(RETROARCH_BIN, "retroarch",
@@ -4234,6 +4307,23 @@ int main(int argc, char *argv[])
             }
         }
 
+        /* Quick start (START): launch from the slot-10 save state, skipping
+         * the slot picker. Without one, say so instead of starting anything. */
+        if ((g_input.pressed & BTN_START_MASK) &&
+            (g_menu.mode == MENU_ROMS || g_menu.mode == MENU_FAVORITES ||
+             g_menu.mode == MENU_RECENTS) && g_menu.count > 0) {
+            MenuEntry *e = &g_menu.entries[g_menu.selected];
+            if (e->system_idx >= 0) {
+                if (quick_state_exists(e)) {
+                    menu_remember_rom();
+                    launch_game(e->path, e->system_idx, QUICK_SLOT);
+                } else {
+                    msg_show("No quick-start save (slot 10)");
+                }
+                dirty = 1;
+            }
+        }
+
         /* Back (B / Circle) */
         if (g_input.pressed & BTN_B_MASK) {
             if (g_menu.mode == MENU_ROMS || g_menu.mode == MENU_FAVORITES ||
@@ -4301,6 +4391,8 @@ int main(int argc, char *argv[])
          * it: without marking that frame dirty it would linger until something
          * else happened to trigger a draw. */
         if (g_jump_hint_frames > 0 && --g_jump_hint_frames == 0)
+            dirty = 1;
+        if (g_msg_frames > 0 && --g_msg_frames == 0)
             dirty = 1;
 
         if (dirty) {

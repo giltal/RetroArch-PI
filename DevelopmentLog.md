@@ -240,3 +240,28 @@ save state they make in real gameplay, and they give the inputs, e.g. Sega Rally
   After that the file is complete: a Flycast session snapshot shows 0 rootfs changes, despite
   the "Saved core options file" log line. A one-time write per core on a fresh image. Shipping
   complete `.opt` files would remove it.
+
+## 2026-10-19 — Launcher: quick start from slot 10 (START)
+
+The user's idea: the slot-10 state they save for the game tests (RetroArch menu → State Slot
+10 → Save State) is a "start here" bookmark the launcher could use. The slot picker only shows
+slots 0–9 (`MAX_SLOTS`), so slot 10 was invisible.
+
+The user chose (asked first; Triangle was proposed, but it already toggles favourites):
+- **START in a game list** (system, favourites, recents) launches from slot 10 (`QUICK_SLOT`),
+  through the same `launch_game()` path as the picker (copy to `.state.auto`,
+  `savestate_auto_load`). No picker.
+- **No slot-10 save:** a centred message for ~2 s, "No quick-start save (slot 10)" (`msg_show`,
+  drawn and expired like the letter-jump hint). Nothing launches.
+- **A ▶ marker** right of the name, left of the favourite star's column, on games with a
+  slot-10 state. Checked for the visible rows at each redraw, so a new state shows when the
+  list comes back.
+- **Saves after a quick start go to slot 0** (PS + R). The launcher normally makes the
+  launched slot the save slot. For slot 10 that would overwrite the bookmark and the tests'
+  start point, so slot 10 changes only on purpose, from the menu.
+- Footer: "START QUICK ▶". Help screen (PS tap): START now reads "Quick start (slot 10)" over
+  "PS + Exit game" (`scripts/gen-help-image.py`, image regenerated).
+
+**User-verified on the Pi 4:** marker shown, START launched from slot 10, PS + R saved to
+slot 0, the message appears on games without a slot-10 save. In the logs: Mario Kart 64
+`LAUNCH ... (slot=10)`, auto-load from `.state.auto` succeeded, `state_slot = "0"`.

@@ -208,10 +208,12 @@ def main():
     x, y = cx - BOX_W / 2, 872
     box(x, y, 'Tap: show this help', 'Hold + a button: game hotkeys', badge=False)
     connect((cx, y), anchors['ps'])
-    # Start: above the controller, between the shoulder buttons
-    w = 300
-    x, y = cx - w / 2, 170
-    h = box(x, y, None, 'Exit game', w)
+    # Start: above the controller, between the shoulder buttons. In the
+    # launcher's game lists it is the quick start (slot 10, launcher.c
+    # QUICK_SLOT); in a game, PS + START exits.
+    w = 360
+    x, y = cx - w / 2, 150
+    h = box(x, y, 'Quick start (slot 10)', 'Exit game', w)
     connect((sta[0], y + h), anchors['start'])
 
     # ---- title / footer ----------------------------------------------------
