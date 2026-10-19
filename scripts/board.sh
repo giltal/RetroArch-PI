@@ -82,9 +82,14 @@ status)
 push)
 	[ $# -gt 0 ] || { echo "usage: board.sh push /board/path..." >&2; exit 1; }
 	if game_running; then echo "ABORT: a game is running on the board."; exit 2; fi
+	# The copies in /tmp are numbered, not named: scp's remote path goes
+	# through a shell, and names have spaces and parentheses
+	# ("Sony PLAYSTATION(R)3 Controller.cfg").
+	i=0
 	for p in "$@"; do
 		[ -f "$T$p" ] || { echo "not in target/: $p" >&2; exit 1; }
-		rcp "$T$p" "root@$BOARD_IP:/tmp/push.$$.$(basename "$p")"
+		i=$((i + 1))
+		rcp "$T$p" "root@$BOARD_IP:/tmp/push.$$.$i"
 	done
 	rsh "/etc/init.d/S12launcher stop >/dev/null 2>&1 || true"
 	# Write next to the target, sync, then rename over it. A rename is atomic,
@@ -93,9 +98,12 @@ push)
 	# found EMPTY (md5 d41d8cd9...) after an unclean power-off.
 	# The mode is copied from target/ too: scp lands files as 0700, which once
 	# left /usr/bin/retroarch at 700 instead of the build's 755.
+	# mkdir -p: a file new in this build may live in a folder the board lacks.
+	i=0
 	for p in "$@"; do
+		i=$((i + 1))
 		m=$(stat -c %a "$T$p")
-		rsh "cp '/tmp/push.$$.$(basename "$p")' '$p.new' && chmod $m '$p.new' && sync && mv '$p.new' '$p' && rm -f '/tmp/push.$$.$(basename "$p")'"
+		rsh "mkdir -p \"\$(dirname '$p')\" && cp '/tmp/push.$$.$i' '$p.new' && chmod $m '$p.new' && sync && mv '$p.new' '$p' && rm -f '/tmp/push.$$.$i'"
 	done
 	rsh "sync; /etc/init.d/S12launcher start >/dev/null 2>&1"
 	for p in "$@"; do

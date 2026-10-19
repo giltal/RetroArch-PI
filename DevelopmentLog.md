@@ -292,3 +292,60 @@ PCSX-ReARMed loads it automatically. The launcher does not list `.sbi`. The US r
 - `game-test.sh` WARNs on the same log line;
 - the card README explains `.sbi` for PS1;
 - `docs/test-plan.md` lists it under WARN.
+
+## 2026-10-19 — K2B and Zero3 rebuilt from the current tree; the K2B synced and game-tested
+
+**Builds** (`linux-dirclean` + `retroarch-dirclean`, then full): K2B 16 min, Zero3 17 min.
+- **Kernel `.config` identical to before the per-family split** (4,701 settings each), and
+  U-Boot identical. The split (common/h616 fragments, the exFAT patch now in
+  `board/common/patches/linux`, genimage and post-build per family) changed nothing for them.
+- Shared and h616 post-build pass. inject-pad and RetroArch with 0009 are built.
+
+**New: `scripts/sync-rootfs.sh <board> [-n]`.** It md5-compares every file in `target/` with
+the board and installs the differing ones with `board.sh push`.
+- Left alone on purpose: kernel and modules (`board.sh kernel`), passwd/group/shadow
+  (image-time accounts), SSH host keys, runtime files, and the core `.opt` files RetroArch
+  filled in.
+- First version: `diff` exits 1 when anything differs, which `pipefail` turned into a silent
+  exit.
+- **`board.sh push`** now numbers its `/tmp` copies, because scp's remote path goes through a
+  shell and names have spaces and parentheses. It also creates missing parent folders.
+
+**K2B:**
+- Synced: 10 of 710 files differed (launcher, RetroArch + wrapper, inject-pad,
+  parallel-n64, `retroarch.cfg`, S11alsa, S46card, card README, help image).
+- `board.sh kernel` (md5 match), reboot. Afterwards 0 files differ. HDMI 1080p, both sound
+  cards, launcher.
+- rcS took 4.4 s on that boot: S46card's one-time copy of the old rootfs saves.
+- The four slot-10 states copied from `test-states/rpi4` (same ROM files; md5-checked).
+
+**Game tests on the K2B:**
+- **First run:** Sega Rally 2 **crashed** on loading its state, and the other three ran
+  ~86%.
+- **The ~86% was the test.** A screenshot stalls the emulator ~2 s on the H616 (the shots came
+  out 4 s apart instead of 2). Mario Kart: 85.6% with a shot every 2 s, 96.9% with shots only
+  at start and end. `video_gpu_screenshot = false` (the core's frame instead of 1080p) did not
+  help, so the cost is not the readback size.
+  - Now: screenshots at the start and end by default (`SHOT_EVERY=0`; `SHOT_EVERY=2` for more).
+- **Second run: all four PASS:**
+
+| Game | Speed | Sound |
+|---|---|---|
+| Sega Rally 2 | 96.6% | -10 dBFS |
+| Mario Kart 64 | 98.1% | -17 dBFS |
+| CTR | 97.1% | -18 dBFS |
+| Burnout Legends | 98.1% | -9 dBFS |
+
+**Open: Flycast crashes intermittently on a state load.** Once in two loads on the K2B, never
+in two on the Pi:
+
+```
+[State]: Loading state ".../Sega Rally 2 (USA).state10"
+[AICA] AICA running on its own thread
+terminate called after throwing an instance of 'std::system_error'
+  what():  Invalid argument
+```
+
+The AICA line is our threaded-audio patch. A state load restarts that thread, and the restart
+threw, typically a join or start on a thread in the wrong state. A race whose timing differs
+by board. A player's PS + L in a Dreamcast game can hit it.

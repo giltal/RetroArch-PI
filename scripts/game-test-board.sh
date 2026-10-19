@@ -77,8 +77,15 @@ EOF
 	sleep $(( settle + 4 ))
 	# Screenshots every 2 s while the pad plays the sequence, one at its start.
 	pidof retroarch.bin >/dev/null && kill -USR1 $(pidof retroarch.bin) 2>/dev/null
+	# SHOT_EVERY (s, default 0): 0 = a screenshot only at the sequence's start
+	# and end. A screenshot stalls the emulator for ~2 s on the H616 (the K2B:
+	# Mario Kart 85.6% with one every 2 s, 96.9% without; video_gpu_screenshot
+	# = false did not help), which would pull the speed meter down. Two shots
+	# still catch black and frozen pictures; a freeze in between also silences
+	# the audio, which the meter catches. SHOT_EVERY=2 for more pictures.
 	while kill -0 $padpid 2>/dev/null; do
-		sleep 2
+		sleep "${SHOT_EVERY:-0}"
+		[ "${SHOT_EVERY:-0}" = 0 ] && { sleep 1; continue; }
 		pidof retroarch.bin >/dev/null && kill -USR1 $(pidof retroarch.bin) 2>/dev/null
 	done
 	sleep 1

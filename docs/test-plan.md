@@ -69,9 +69,12 @@ speed anyway. The game tests play the hard part of each game:
   plays the game's sequence from `scripts/game-tests.txt`, e.g.
   `R2:5 R2+RIGHT:0.5 R2:5` (hold R2 5 s, R2 + right 0.5 s, R2 5 s). Triggers and
   sticks are analog (`R2=60`, `LX=-50`).
-- **Checks:** a screenshot every 2 s (RetroArch patch 0009: `kill -USR1`
-  takes one, without touching input), the audio meter (patch 0007: speed,
-  and 0009: level), the state load and the process.
+- **Checks:** a screenshot at the start and the end of the sequence
+  (RetroArch patch 0009: `kill -USR1` takes one, without touching input), the
+  audio meter (patch 0007: speed, and 0009: level), the state load and the
+  process. A screenshot stalls the emulator (~2 s on the H616), so more of them
+  would pull the speed down: `SHOT_EVERY=2` takes one every 2 s for a closer
+  look, at the cost of the speed figure.
 
 | Verdict | When |
 |---|---|
