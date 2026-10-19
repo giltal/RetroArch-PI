@@ -265,3 +265,30 @@ The user chose (asked first; Triangle was proposed, but it already toggles favou
 **User-verified on the Pi 4:** marker shown, START launched from slot 10, PS + R saved to
 slot 0, the message appears on games without a slot-10 save. In the logs: Mario Kart 64
 `LAUNCH ... (slot=10)`, auto-load from `.state.auto` succeeded, `state_slot = "0"`.
+
+## 2026-10-19 — CTR froze mid-game: LibCrypt without its .sbi
+
+The user: CTR starts, then hangs at some point; quitting still works. RetroArch's log of the
+running session:
+
+```
+CD-ROM ID: SCES02105
+LibCrypt game detected with missing SBI/subchannel
+```
+
+The card's CTR is the European release, which is LibCrypt-protected. Its protection checks
+subchannel data that a `.bin/.cue` rip does not contain. When the check fails, the game
+breaks itself later, typically freezing in or after a race. Only the game inside RetroArch is
+stuck, so it is the same on every board. The sweeps never caught it, because they ran CTR for
+30 s at the title screen.
+
+**Fix: the user's disc's `.sbi` (from its redump entry) next to the `.cue`, same name.**
+PCSX-ReARMed loads it automatically. The launcher does not list `.sbi`. The US release
+(SCUS-94426) has no LibCrypt. No change to the image.
+
+**So it cannot pass a test unnoticed again:**
+- `release-test-board.sh` reports "LibCrypt: .sbi missing next to the .cue" in place of other
+  log errors, and `release-test.sh` turns that PASS into WARN;
+- `game-test.sh` WARNs on the same log line;
+- the card README explains `.sbi` for PS1;
+- `docs/test-plan.md` lists it under WARN.

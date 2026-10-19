@@ -74,6 +74,9 @@ for d in "$RES"/game-test/*/; do
 	elif awk -v m="$mean" 'BEGIN { exit !(m < 95) }'; then warn "speed $mean%"; fi
 	if [ -n "$rmsmax" ] && awk -v r="$rmsmax" 'BEGIN { exit !(r <= -99) }'; then fail "silent"
 	elif [ -n "$rmsmax" ] && awk -v r="$rmsmax" 'BEGIN { exit !(r < -60) }'; then warn "very quiet ($rmsmax dBFS)"; fi
+	# LibCrypt-protected PAL PS1 disc without its .sbi: runs, then freezes later.
+	grep -a -q 'LibCrypt game detected with missing SBI' "$d/ra.log" 2>/dev/null \
+		&& warn "LibCrypt: .sbi missing next to the .cue (game freezes later)"
 	[ -n "$err" ] && notes="$notes log: $err;"
 	printf '%-34s %-7s %-9s %-26s %-16s %s\n' "$name" "$verdict" "${mean:--}%" \
 		"$nshots shots, $moving moving" "rms ${rmsmax:--} dB" "${notes# }"

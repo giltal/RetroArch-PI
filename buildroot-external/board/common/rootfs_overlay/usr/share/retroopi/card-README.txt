@@ -15,6 +15,10 @@ _system\bios is where BIOS files go (PlayStation: SCPH1001.BIN).
   Dreamcast (optional): _system\bios\dc\dc_boot.bin and dc_flash.bin.
   _system\bios\PPSSPP is created by the console itself - leave it alone.
 
+PlayStation: psx\Game.cue + Game.bin (or .chd / .pbp). Some European
+           discs are LibCrypt-protected (e.g. Crash Team Racing, SCES-02105):
+           without the disc's Game.sbi next to the .cue they start, then
+           freeze later. Same name as the .cue, from the disc's redump entry.
 PSP:       psp\Game.iso (or .cso / .chd)
 Dreamcast: dreamcast\Game.chd (or .cdi), or a GDI set in its own folder:
            dreamcast\Game Name\disc.gdi + track01.bin, track02.raw, ...

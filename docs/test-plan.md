@@ -76,7 +76,7 @@ speed anyway. The game tests play the hard part of each game:
 | Verdict | When |
 |---|---|
 | FAIL | RetroArch exited; slot 10 did not load; every screenshot black; the picture never changed; speed mean < 80%; digital silence |
-| WARN | speed 80–95%; some black or unchanged screenshots; very quiet sound (RMS < -60 dBFS) |
+| WARN | speed 80–95%; some black or unchanged screenshots; very quiet sound (RMS < -60 dBFS); a LibCrypt PS1 disc without its `.sbi` (it would freeze later; also flagged by the sweep in part 1) |
 | PASS | everything else |
 
 Results, screenshots and logs: `<work>/game-tests/<date-time>/`. Look at the

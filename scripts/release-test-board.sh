@@ -54,6 +54,10 @@ while IFS='|' read -r sys core rom settle measure envs; do
 	renderer=$(grep -m1 -o 'Renderer: .*' "$LOG" | cut -c11-60)
 	temp=$(cat /sys/class/thermal/thermal_zone0/temp 2>/dev/null)
 	err=$(grep -m1 -i -E 'failed to load|could not|segmentation|aborted|fatal' "$LOG" | cut -c1-100)
+	# A LibCrypt-protected PAL PS1 disc without its .sbi runs fine at first and
+	# freezes later (CTR, 2026-10-19): it must not pass at the title screen.
+	grep -a -q 'LibCrypt game detected with missing SBI' "$LOG" \
+		&& err="LibCrypt: .sbi missing next to the .cue (game freezes later)"
 	stop_ra $pid
 	echo "RESULT|$sys|$rom|$alive|$speeds|$renderer|$temp|$err" >> "$OUT"
 done < "$LIST"

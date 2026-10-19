@@ -52,6 +52,7 @@ ssh "${O[@]}" root@"$BOARD_IP" 'sh /tmp/release-test-board.sh /tmp/release-tests
 		else if (mean < 80) v = "FAIL"
 		else if (mean < 95) v = "WARN"
 		else v = "PASS"
+		if (v == "PASS" && $8 ~ /LibCrypt/) v = "WARN"
 		printf "%-5s %-10s %-45.45s alive=%-3s speed mean %5.1f%% min %5.1f%% (%d samples)  %d C  %s %s\n",
 			v, $2, $3, $4, mean, (n ? min : 0), n, $7 / 1000, $6, ($8 != "" ? "ERR: " $8 : "")
 	}'
