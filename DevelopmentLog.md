@@ -349,3 +349,45 @@ terminate called after throwing an instance of 'std::system_error'
 The AICA line is our threaded-audio patch. A state load restarts that thread, and the restart
 threw, typically a join or start on a thread in the wrong state. A race whose timing differs
 by board. A player's PS + L in a Dreamcast game can hit it.
+
+## 2026-10-19 — Flycast: crash on savestate load fixed (threaded-AICA start/stop race)
+
+**Reproduced on the K2B:** the virtual pad loaded Sega Rally 2's slot 10 every 3 s, and the
+18th of 25 loads crashed RetroArch:
+
+```
+terminate called after throwing an instance of 'std::system_error'
+  what():  Invalid argument
+```
+
+**The cause is a race in our 0007 (threaded AICA).**
+- `startThread()` runs on the SH4 thread (`AicaUpdate`), and set `threadRunning = true` before
+  assigning the `std::thread`.
+- `stopThread()` runs from the emulator's stop/reset/term on the frontend thread. On a load,
+  `emu.stop()` stops the AICA thread while the SH4 thread may still be in `AicaUpdate`,
+  restarting it (hence two "AICA running on its own thread" lines per load).
+- Nothing serialised the two. A stop could `join()` a thread flagged running but not yet
+  assigned, or one another stop had already joined. `join()` on a non-joinable `std::thread`
+  throws EINVAL, which crashed RetroArch.
+
+**Fix, in 0007:** a `threadCtl` mutex around start and stop, which both decide by
+`thread.joinable()` instead of the flag; the flag is set only after the thread exists. No
+deadlock path: the AICA thread never takes `threadCtl`.
+- Regenerated only 0007's `aica.cpp` section: the before-state is the built file with that
+  section reversed.
+- The whole series 0001–0008 dry-run on pristine Flycast v2.7: all apply, and the result is the
+  edited file.
+
+**Verified on the K2B:**
+- **75 reloads in 3 runs, 0 crashes** (before: a crash at the 18th);
+- game tests all PASS: Sega Rally 2 97.3% at -10 dBFS, Mario Kart 96.8%, CTR 97.1%,
+  Burnout 98.4%.
+
+**Not yet installed** on the Pi 4 and the Zero3: both were offline. Install them with
+`build.sh <board> libretro-flycast-dirclean` + build, then `sync-rootfs.sh`.
+
+Also seen, still open:
+- Flycast game tests take only the start screenshot; the end one is missing (other cores get
+  both).
+- The K2B's `Flycast.opt` holds three `reicast_texupscale*`/`dump_unique_textures` values the
+  core rejects ("Invalid value"), left over from an older core. Harmless; defaults apply.
