@@ -391,3 +391,25 @@ Also seen, still open:
   both).
 - The K2B's `Flycast.opt` holds three `reicast_texupscale*`/`dump_unique_textures` values the
   core rejects ("Invalid value"), left over from an older core. Harmless; defaults apply.
+
+## 2026-10-21 — Zero3 aligned with the current tree
+
+- Flycast rebuilt with the fixed 0007 (the Zero3's image had been built before the fix).
+- `sync-rootfs.sh zero3`: 11 of 710 files (the K2B's 10, plus Flycast). Then
+  `board.sh kernel` (md5 match) and a reboot.
+- Afterwards 0 files differ. HDMI 1080p, both sound cards, launcher running.
+- rcS took 5.6 s on that boot: S46card's one-time copy of the old rootfs saves, as on the K2B.
+- The card has the same four test games, the same files as the K2B's (first-MB checksums). The
+  four slot-10 states copied from `test-states/rpi4`, md5-checked.
+- **Game tests, all PASS:**
+
+| Game | Speed | Sound |
+|---|---|---|
+| Sega Rally 2 | 95.1% | -10 dBFS |
+| Mario Kart 64 | 97.7% | -17 dBFS |
+| CTR | 97.0% | -18 dBFS |
+| Burnout Legends | 98.7% | -9 dBFS |
+
+- **Flycast reload stress:** 50 slot-10 loads in 2 runs, 0 crashes.
+
+Both H616 boards now run the current tree. The Pi 4 still lacks the Flycast fix (offline).

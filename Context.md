@@ -42,9 +42,9 @@ on the card with the in-game saves; nothing is written to the rootfs during play
 from slot 10 (START); game tests with a virtual DualShock 3 (`scripts/game-test.sh`, 4 games);
 GoldenEye/Perfect Dark and Conker fixed on the N64 dynarec (parallel-n64 0004/0005).
 
-1. **Bring the Zero3 and K2B up to date** (in progress 2026-10-19): both last built before the
-   per-family split and the shared work above. Rebuild, `scripts/sync-rootfs.sh` +
-   `board.sh kernel`, then the game tests with `test-states/` copied to their cards.
+1. ~~**Bring the Zero3 and K2B up to date.**~~ Done 2026-10-19/21: rebuilt (kernel and U-Boot
+   identical to before the split), synced with `scripts/sync-rootfs.sh`, game tests all PASS on
+   both, Flycast reload stress clean. Left: the Pi 4's Flycast (the 0007 race fix).
 2. **Raspberry Pi 4** (`docs/boards/rpi4.md`): release sweep; analog L2/R2 (triggers are
    digital in our PS3 autoconfig); onboard Bluetooth; GPIO3 power button. Parked: the ~7 s
    of firmware boot (needs the serial log), the rest of the read-only root.
