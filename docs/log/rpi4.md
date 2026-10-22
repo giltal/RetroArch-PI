@@ -455,3 +455,7 @@ Every log shows `[KMS]: Skipping /dev/dri/card2 (status panel)`, then 1920x1080 
 "Unloading game". It was in every Flycast game test on all three boards since 2026-10-19.
 **Fixed the same evening by Flycast patch 0009** (`DevelopmentLog.md`); Sega Rally 2 now
 exits cleanly on the Pi 4.
+- **PSP games showed nothing on the LCD:** PPSSPP renames RetroArch's main thread, which
+  renames the process (`comm` = `Main`), so lcdinfo's process-name check missed it. It now
+  identifies RetroArch by its program (`/proc/<pid>/exe` = `retroarch.bin`), which no core
+  can rename. User-checked with a PSP game: system, name and cover shown.

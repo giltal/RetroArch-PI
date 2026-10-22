@@ -161,13 +161,19 @@ static int now_playing(char *game, size_t glen, char *sys, size_t slen, char *ke
 	if (!d)
 		return 0;
 	while (!found && (e = readdir(d))) {
-		char path[300], comm[32], args[1024];
+		char path[300], exe[300], args[1024];
+		ssize_t el;
 		if (e->d_name[0] < '0' || e->d_name[0] > '9')
 			continue;
-		snprintf(path, sizeof path, "/proc/%s/comm", e->d_name);
-		/* /usr/bin/retroarch is a wrapper script that execs retroarch.bin */
-		if (read_line(path, comm, sizeof comm) ||
-		    (strcmp(comm, "retroarch") && strcmp(comm, "retroarch.bin")))
+		/* By the program, not the process name: /usr/bin/retroarch is a
+		 * wrapper that execs retroarch.bin, and a core can rename the main
+		 * thread, which renames the process (PPSSPP: "Main"). */
+		snprintf(path, sizeof path, "/proc/%s/exe", e->d_name);
+		if ((el = readlink(path, exe, sizeof exe - 1)) <= 0)
+			continue;
+		exe[el] = 0;
+		const char *prog = strrchr(exe, '/') ? strrchr(exe, '/') + 1 : exe;
+		if (strcmp(prog, "retroarch.bin") && strcmp(prog, "retroarch"))
 			continue;
 		snprintf(path, sizeof path, "/proc/%s/cmdline", e->d_name);
 		FILE *f = fopen(path, "r");

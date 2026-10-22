@@ -3939,6 +3939,42 @@ static int search_run(void)
  * Game Launching
  * ========================================================================= */
 
+/*
+ * CPU governor: adaptive in the menu, performance in games.
+ *
+ * S05perf pins "performance" at boot, and /usr/bin/retroarch (the wrapper,
+ * retroarch.mk) sets it again for every game: schedutil raises the clock only
+ * after the load arrives, and those dips cost audio buffers (Zero3, Mario Kart
+ * 64: 10/9/9 xruns vs 6/6/6). The menu needs none of that, so it runs on
+ * schedutil (ondemand where there is none) and the CPU idles at its lowest
+ * clock instead of its highest. Set once the menu is up and whenever a game
+ * returns to it. A game started without the launcher (the test scripts stop
+ * it) still gets performance from the wrapper.
+ */
+static void cpu_governor_menu(void)
+{
+    char avail[256] = "";
+    FILE *f = fopen("/sys/devices/system/cpu/cpu0/cpufreq/scaling_available_governors", "r");
+    if (!f)
+        return;                                 /* no cpufreq */
+    if (!fgets(avail, sizeof(avail), f))
+        avail[0] = 0;
+    fclose(f);
+    const char *gov = strstr(avail, "schedutil") ? "schedutil" :
+                      strstr(avail, "ondemand") ? "ondemand" : NULL;
+    if (!gov)
+        return;
+    for (int i = 0; i < 16; i++) {
+        char path[96];
+        snprintf(path, sizeof(path), "/sys/devices/system/cpu/cpu%d/cpufreq/scaling_governor", i);
+        if ((f = fopen(path, "w"))) {
+            fprintf(f, "%s\n", gov);
+            fclose(f);
+        }
+    }
+    printf("CPU: governor %s (menu)\n", gov);
+}
+
 static void launch_game(const char *rom_path, int system_idx, int state_slot)
 {
     char core_path[MAX_NAME];
@@ -4039,6 +4075,7 @@ static void launch_game(const char *rom_path, int system_idx, int state_slot)
     } else {
         fprintf(stderr, "LAUNCH: fork failed: %s\n", strerror(errno));
     }
+    cpu_governor_menu();
 
     /* Re-initialize everything */
     drm_init();
@@ -4169,6 +4206,7 @@ int main(int argc, char *argv[])
     startup_mark("state+draw");
 
     printf("STARTUP: ready in %.0f ms\n", startup_now_ms());
+    cpu_governor_menu();
 
     /* Main loop */
     int dirty = 0;

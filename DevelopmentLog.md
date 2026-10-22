@@ -452,3 +452,26 @@ with no abort. **The K2B and Zero3 need the new core** (offline today):
 Also today: BusyBox has no `pkill`/`pgrep`, so the cleanup traps of `release-test.sh` and
 `game-test.sh` never stopped the board side; both now kill through `ps | grep`
 (`docs/log/rpi4.md`, game tests entry).
+
+## 2026-10-22 — CPU governor: schedutil in the menu, performance in games
+
+Until now S05perf pinned `performance` for good, so the CPU sat at its top clock even idling in
+the menu (the user noticed 1.8 GHz on the Pi 4's LCD). The reason for `performance` is games:
+schedutil raises the clock only after the load arrives, and those dips cost audio buffers
+(Zero3, Mario Kart 64: 10/9/9 xruns vs 6/6/6). The menu has no audio to protect.
+
+- **Launcher** (`cpu_governor_menu()`): switches to `schedutil` (or `ondemand` where there is
+  no schedutil) once the menu is up, and again whenever a game returns.
+- **`/usr/bin/retroarch` wrapper** (`retroarch.mk`): sets `performance` for every game,
+  however it is started. The game tests and the sweep stop the launcher and start RetroArch
+  themselves, so they still run at full clocks.
+- **S05perf** is unchanged: boot runs at `performance`.
+
+**Pi 4:**
+- In the menu, `schedutil`, with the clock at 600–1200 MHz between redraws (was a fixed 1800).
+- Mid-game: `performance` at 1800 MHz.
+- Game tests: 4 PASS, 98.9–101.1%, as before.
+- After the run, the launcher had set `schedutil` again.
+
+**K2B and Zero3:** they get this with their next launcher and RetroArch install
+(`build.sh <board>`, then `sync-rootfs.sh <board>`). The H618's cpufreq offers schedutil too.

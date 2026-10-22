@@ -153,9 +153,12 @@ RETROARCH_POST_CONFIGURE_HOOKS += RETROARCH_FIX_DRM_INCLUDE
 # $HOME/.cache on the rootfs, written whenever a 3D game compiles a new shader.
 # On the card instead, so play writes nothing to the rootfs (power cuts: see
 # DevelopmentLog 2026-10-19). Losing it costs only a recompile.
+# The CPU governor goes to performance for every game, however it is started:
+# the launcher's menu runs on schedutil (launcher.c, cpu_governor_menu), and
+# schedutil's late clock ramps cost audio xruns in games (S05perf).
 define RETROARCH_INSTALL_WRAPPER
 	mv $(TARGET_DIR)/usr/bin/retroarch $(TARGET_DIR)/usr/bin/retroarch.bin
-	printf '#!/bin/sh\nexport HOME=/root\nexport RETROARCH_LOG_FPS=1\nexport RETROARCH_LOG_SPEED=1\nexport MESA_SHADER_CACHE_DIR=/opt/roms/_system/cache/mesa\nexec /usr/bin/retroarch.bin --verbose "$$@" 2>>/tmp/retroarch_verbose.log\n' > $(TARGET_DIR)/usr/bin/retroarch
+	printf '#!/bin/sh\nexport HOME=/root\nexport RETROARCH_LOG_FPS=1\nexport RETROARCH_LOG_SPEED=1\nexport MESA_SHADER_CACHE_DIR=/opt/roms/_system/cache/mesa\nfor g in /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor; do echo performance > $$g; done 2>/dev/null\nexec /usr/bin/retroarch.bin --verbose "$$@" 2>>/tmp/retroarch_verbose.log\n' > $(TARGET_DIR)/usr/bin/retroarch
 	chmod +x $(TARGET_DIR)/usr/bin/retroarch
 endef
 RETROARCH_POST_INSTALL_TARGET_HOOKS += RETROARCH_INSTALL_WRAPPER

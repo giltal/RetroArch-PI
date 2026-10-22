@@ -20,7 +20,9 @@
 # zones and cooling maps are in mainline, so it throttles rather than cooks.
 #
 # S05 so it is in place before udev coldplug (S10), the biggest load spike of
-# the boot.
+# the boot. Once the menu is up, the launcher switches to schedutil (the menu
+# has no audio to protect, and the CPU then idles at its lowest clock), and
+# /usr/bin/retroarch puts performance back for every game.
 
 case "$1" in
 	start|restart|reload)
