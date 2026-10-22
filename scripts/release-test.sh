@@ -35,7 +35,10 @@ ssh "${O[@]}" root@"$BOARD_IP" 'cat /etc/issue | head -1; uname -r; uptime'
 # run and give the board its launcher back: a test game must never be left
 # playing on the TV (one was, once, in lockstep-audio mode).
 cleanup() {
-	ssh "${O[@]}" root@"$BOARD_IP" 'pkill -f release-test-board.sh; killall retroarch.bin 2>/dev/null; sleep 3;
+	# BusyBox has no pkill: with it this cleanup silently did nothing and an
+	# interrupted sweep kept launching games (2026-10-22, it ran into a game test).
+	ssh "${O[@]}" root@"$BOARD_IP" 'ps | grep "[r]elease-test-board" | while read p rest; do kill $p; done;
+		killall retroarch.bin 2>/dev/null; sleep 3;
 		killall -9 retroarch.bin 2>/dev/null; pidof retroopi_launcher >/dev/null || /etc/init.d/S12launcher start' >/dev/null 2>&1 || true
 }
 trap 'echo "release-test: interrupted, stopping the run on the board"; cleanup; exit 130' INT TERM HUP

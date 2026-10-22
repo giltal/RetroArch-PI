@@ -1,0 +1,61 @@
+From: RetroArch-PI
+Subject: [PATCH] libretro: send no AV info while the game is being unloaded
+
+Every exit from a Dreamcast game aborted RetroArch with
+"free(): invalid pointer" (all boards, every game test since 2026-10-19).
+Backtrace (LD_PRELOAD SIGABRT handler, Pi 4):
+
+  retro_unload_game -> Emulator::unloadGame -> Emulator::dc_reset
+    -> pvr::reset -> spg_Reset -> retro_refresh_av_info
+    -> RETRO_ENVIRONMENT_SET_SYSTEM_AV_INFO -> RetroArch rebuilds its video
+       driver inside its own content unload -> free(): invalid pointer
+
+retro_refresh_av_info() already returns early once game_data is empty, but
+retro_unload_game() clears game_data only after emu.unloadGame(). Mark the
+unload explicitly and send neither AV info nor geometry during it; drop any
+request patch 0003 queued for the next retro_run(), which will not come.
+
+--- a/shell/libretro/libretro.cpp	2026-10-22 21:21:44.971794097 +0300
++++ b/shell/libretro/libretro.cpp	2026-10-22 21:21:44.987792760 +0300
+@@ -233,6 +233,12 @@
+ static bool onMainThread() {
+ 	return std::this_thread::get_id() == main_thread_id;
+ }
++// Set while retro_unload_game() runs. Emulator::unloadGame() resets the
++// Dreamcast (dc_reset -> pvr::reset -> spg_Reset), which reports new video
++// timings: SET_SYSTEM_AV_INFO in the middle of RetroArch's content unload made
++// it rebuild its video driver there and abort ("free(): invalid pointer") on
++// every exit from a game. Nothing is shown any more, so nothing is sent.
++static bool unloading;
+ static u64 startTime;
+ 
+ // Disk swapping
+@@ -780,7 +786,7 @@
+ {
+ 	retro_system_av_info avinfo;
+ 
+-	if (first_run || game_data.empty())
++	if (first_run || game_data.empty() || unloading)
+ 		return false;
+ 
+ 	if (fps > 0 && fps < 100)
+@@ -803,6 +809,8 @@
+ 
+ void retro_resize_renderer(int w, int h, float aspectRatio)
+ {
++	if (unloading)
++		return;
+ 	if (w == framebufferWidth && h == framebufferHeight && aspectRatio == framebufferAspectRatio)
+ 		return;
+ 	if (w < 4 || h < 4)
+@@ -2484,7 +2492,10 @@
+ void retro_unload_game()
+ {
+ 	INFO_LOG(COMMON, "Flycast unloading game");
++	unloading = true;
+ 	emu.unloadGame();
++	unloading = false;
++	avinfo_deferred = 0;
+ 	dreampotato::term();
+ 	game_data.clear();
+ 	disk_paths.clear();

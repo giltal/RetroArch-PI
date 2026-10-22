@@ -33,7 +33,8 @@ echo "game-test: $(wc -l < "$RES/list.txt") test(s) on $BOARD_NAME -- the TV sho
 
 scp -O "${O[@]}" "$PROJ/scripts/game-test-board.sh" "$RES/list.txt" "root@$BOARD_IP:/tmp/" >/dev/null
 # If interrupted here, stop the board-side run too (it restarts the launcher).
-trap 'rsh "pkill -f game-test-board.sh; killall inject-pad retroarch.bin; sleep 2; /etc/init.d/S12launcher start" >/dev/null 2>&1; exit 130' INT TERM
+# BusyBox has no pkill: kill the board-side script through ps.
+trap 'rsh "ps | grep \"[g]ame-test-board\" | while read p rest; do kill \$p; done; killall inject-pad retroarch.bin; sleep 2; /etc/init.d/S12launcher start" >/dev/null 2>&1; exit 130' INT TERM
 rsh "sed -i 's/\r\$//' /tmp/game-test-board.sh /tmp/list.txt; SHOT_EVERY=${SHOT_EVERY:-0} sh /tmp/game-test-board.sh /tmp/list.txt /tmp/game-test" > "$RES/board.txt" 2>&1 || true
 trap - INT TERM
 rsh "cd /tmp && tar cf - game-test" | tar -C "$RES" -xf -

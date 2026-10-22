@@ -413,3 +413,42 @@ Also seen, still open:
 - **Flycast reload stress:** 50 slot-10 loads in 2 runs, 0 crashes.
 
 Both H616 boards now run the current tree. The Pi 4 still lacks the Flycast fix (offline).
+
+## 2026-10-22 — Flycast: "free(): invalid pointer" on every exit from a game fixed (patch 0009)
+
+RetroArch aborted with `free(): invalid pointer` whenever a Dreamcast game was closed. It
+showed in every Flycast game test on all three boards since 2026-10-19, after
+`Unloading game..`. The abort meant RetroArch never reached `Unloading core..`, so
+Flycast's `.opt` was not re-saved on exit. Game saves were not affected: Flycast has no SRAM
+file, and the VMU files are written while the game plays.
+
+**Backtrace without gdb:** there is no gdb on the board or the host.
+- `LD_PRELOAD` a small SIGABRT handler that logs `backtrace()` frames with `dladdr`
+  module offsets, added to the `/usr/bin/retroarch` wrapper for one game test and removed
+  afterwards.
+- Symbols come from the core's own `.dynsym`, and from an unstripped relink of the same
+  objects (`CMakeFiles/flycast_libretro.dir/link.txt` without `-s`; `.text` identical).
+
+```
+retro_unload_game -> Emulator::unloadGame -> Emulator::dc_reset -> pvr::reset
+  -> spg_Reset -> retro_refresh_av_info -> SET_SYSTEM_AV_INFO
+  -> RetroArch rebuilds its video driver inside its own content unload -> abort
+```
+
+The same family as patch 0003: SET_SYSTEM_AV_INFO at a moment the frontend cannot take it.
+`retro_refresh_av_info()` already skips once `game_data` is empty, but `retro_unload_game()`
+clears it only after `emu.unloadGame()`.
+
+**Patch 0009** (`libretro-flycast/0009-libretro-no-av-info-while-unloading.patch`):
+- an `unloading` flag set around `emu.unloadGame()`;
+- `retro_refresh_av_info()` and `retro_resize_renderer()` send nothing while it is set;
+- any request 0003 had queued for the next `retro_run()` is dropped.
+
+**Verified on the Pi 4:** the Sega Rally 2 game test passes (99.9%), and the log now ends
+`Unloading game.. / Unloading core.. / Unloading core symbols.. / Saved core options file`
+with no abort. **The K2B and Zero3 need the new core** (offline today):
+`build.sh <board> libretro-flycast-dirclean`, a full build, then `sync-rootfs.sh <board>`.
+
+Also today: BusyBox has no `pkill`/`pgrep`, so the cleanup traps of `release-test.sh` and
+`game-test.sh` never stopped the board side; both now kill through `ps | grep`
+(`docs/log/rpi4.md`, game tests entry).

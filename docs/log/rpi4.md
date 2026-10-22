@@ -426,3 +426,32 @@ What changed:
   It sits under `CPU <temp> <clock> avg N%`, and IP and uptime now share the first line.
   The average alone hid a maxed-out emulator thread (one full core of four reads 25%).
   User-checked.
+
+## 2026-10-22 — Game tests with the LCD on: 4 PASS (after a test-script fix)
+
+`game-test.sh rpi4`, with patch 0010, the new Flycast (0007) and the status LCD running:
+
+| Game | Verdict | Speed | Sound |
+|---|---|---|---|
+| Sega Rally 2 (DC) | PASS | 99.9% | rms -9.8 dB |
+| Mario Kart 64 (N64) | PASS | 99.4% | rms -16.9 dB |
+| CTR (PS1) | PASS | 99.2% | rms -18.1 dB |
+| Burnout Legends (PSP) | PASS | 100.4% | rms -9.1 dB |
+
+Every log shows `[KMS]: Skipping /dev/dri/card2 (status panel)`, then 1920x1080 on HDMI.
+
+**The first run failed two of the four (MK64, Burnout: "slot-10 state did not load").**
+- Their logs were of other games (Super Mario 64, then MK64), 73 s apart: the release sweep
+  I had started and stopped just before was **still running on the board**.
+- Stopping the host side leaves the board side running, and the sweep's own cleanup
+  (`pkill -f release-test-board.sh`) does nothing: **BusyBox here has no pkill or pgrep.**
+  That has been true since the cleanup was written, so an interrupted sweep has never
+  stopped on the board. `game-test.sh`'s trap had the same bug.
+- Both now kill through `ps | grep "[r]elease-test-board" | while read p rest; do kill $p; done`
+  (`game-test-board` in game-test.sh); tested on the board.
+- Rerun with nothing else running: 4 PASS.
+
+**Not new:** Flycast printed `free(): invalid pointer` while RetroArch exited, after
+"Unloading game". It was in every Flycast game test on all three boards since 2026-10-19.
+**Fixed the same evening by Flycast patch 0009** (`DevelopmentLog.md`); Sega Rally 2 now
+exits cleanly on the Pi 4.
