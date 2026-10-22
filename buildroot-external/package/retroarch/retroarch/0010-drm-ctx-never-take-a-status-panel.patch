@@ -1,0 +1,38 @@
+drm_ctx: never take a status panel (panel-mipi-dbi) for the game display
+
+gfx_ctx_drm_init() lists /dev/dri in readdir order and takes the first card
+with a connected connector. On the Pi 4 arcade case the small SPI status LCD
+(panel-mipi-dbi, card2) is such a card, and it was listed before vc4 (card0):
+every game opened on the 320x240 panel and exited with
+
+  [ERROR] [KMS/EGL]: Did not find suitable video mode for 1920 x 1080.
+  [ERROR] [Video]: Cannot open video driver.. Exiting..
+
+Skip devices whose DRM driver is panel-mipi-dbi; the launcher does the same.
+
+--- a/gfx/drivers_context/drm_ctx.c	2026-10-22 20:40:43.036657774 +0300
++++ b/gfx/drivers_context/drm_ctx.c	2026-10-22 20:40:43.056657793 +0300
+@@ -746,6 +746,23 @@
+ 
+    fd = drm->fd;
+ 
++   /* An SPI status panel (panel-mipi-dbi, the Pi 4 arcade case's LCD) is a
++    * KMS device with a connected connector too, and /dev/dri is listed in
++    * readdir order, so it can come first. Games belong on the main display:
++    * never take the panel. */
++   {
++      drmVersionPtr ver = drmGetVersion(fd);
++      bool info_panel   = ver && ver->name
++         && string_is_equal(ver->name, "panel-mipi-dbi");
++      if (ver)
++         drmFreeVersion(ver);
++      if (info_panel)
++      {
++         RARCH_LOG("[KMS]: Skipping %s (status panel).\n", gpu);
++         goto nextgpu;
++      }
++   }
++
+    if (!drm_get_resources(fd))
+       goto nextgpu;
+ 

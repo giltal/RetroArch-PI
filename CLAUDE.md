@@ -141,6 +141,7 @@ C:\RetroArch_PI
     board/kickpi-k2b/ linux.config, patches/linux (0060-0066), patches/uboot (0001-0002), extlinux.conf
     board/rpi4/       config.txt, cmdline.txt, genimage.cfg, rootfs_overlay/etc/fstab
   launcher/  tools/
+  hardware/rpi4-arcade-case/  arcade_case.py (Fusion API script: the source), step/, 3mf/, stl/, README.md
   scripts/   boards.sh, build.sh, board.sh, serial.ps1, fetch-thumbnails.py, gen-*.py,
              rpi4-eeprom.sh (Pi 4 bootloader update; changes the board: ask first)
   firmware/<board>/   build output (gitignored)

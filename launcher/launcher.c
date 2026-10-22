@@ -928,6 +928,17 @@ static int drm_open_kms(void)
         if (fd < 0)
             continue;
 
+        /* The Pi 4 arcade case's SPI LCD (panel-mipi-dbi) is a KMS device
+         * too, but it shows lcdinfo's status page; the menu stays on HDMI. */
+        drmVersionPtr ver = drmGetVersion(fd);
+        bool info_panel = ver && ver->name && !strcmp(ver->name, "panel-mipi-dbi");
+        if (ver)
+            drmFreeVersion(ver);
+        if (info_panel) {
+            close(fd);
+            continue;
+        }
+
         drmModeRes *res = drmModeGetResources(fd);
         if (res && res->count_connectors > 0 && res->count_crtcs > 0) {
             drmModeFreeResources(res);

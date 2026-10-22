@@ -17,7 +17,7 @@ Per-board history: `docs/log/<board>.md`. Shared work from the merge on: `Develo
 | Kernel | mainline 6.18.53 + Armbian | same | Raspberry Pi `rpi-6.18.y` (6.18.57) |
 | Ethernet PHY | Motorcomm YT8531 | Maxio MAE0621A (Armbian driver; PI6 nRESET hogged high) | BCM54213PE (bcmgenet) |
 | HDMI | micro | full-size | micro (HDMI0) |
-| Power button | none (power off from the launcher) | GPIO PC2: clean shutdown; cannot power on | none yet (GPIO3 planned: off and on) |
+| Power button | none (power off from the launcher) | GPIO PC2: clean shutdown; cannot power on | GPIO3 (gpio-shutdown): clean off and power on, tested |
 | eMMC | none | optional; not fitted on ours; not supported | none |
 | CPU/GPU clocks | 1512 MHz CPU, 600 MHz GPU (patches 0050/0051) | same, patch 0066 (peak 78 °C in the stress test with the heatsink; fan to be added) | 1800 MHz (`arm_boost`) |
 | Power-on to menu | ~6 s | ~6 s | 9 s (~7 s of it firmware) |
@@ -44,9 +44,9 @@ GoldenEye/Perfect Dark and Conker fixed on the N64 dynarec (parallel-n64 0004/00
 
 1. ~~**Bring the Zero3 and K2B up to date.**~~ Done 2026-10-19/21: rebuilt (kernel and U-Boot
    identical to before the split), synced with `scripts/sync-rootfs.sh`, game tests all PASS on
-   both, Flycast reload stress clean. Left: the Pi 4's Flycast (the 0007 race fix).
+   both, Flycast reload stress clean. The Pi 4's Flycast got the 0007 race fix on 2026-10-22.
 2. **Raspberry Pi 4** (`docs/boards/rpi4.md`): release sweep; analog L2/R2 (triggers are
-   digital in our PS3 autoconfig); onboard Bluetooth; GPIO3 power button. Parked: the ~7 s
+   digital in our PS3 autoconfig); onboard Bluetooth; volume on the "PS3 Controller" USB pad (volumed matches only the Sony name). Parked: the ~7 s
    of firmware boot (needs the serial log), the rest of the read-only root.
 3. **K2B** (`docs/boards/kickpi-k2b.md`): DS3 over a USB Bluetooth dongle; a fan, then the stress
    test again; optional "soft off"; the harmless `__request_module` warning.

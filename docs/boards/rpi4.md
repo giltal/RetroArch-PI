@@ -32,6 +32,7 @@ power-on**, and **nothing a power cut can break**. Everything below is judged ag
 | USB | 2× USB 3.0 + 2× USB 2.0 behind a VL805 (PCIe) | |
 | Power | USB-C 5 V/3 A. **GPIO3 to GND wakes a halted Pi**: with `dtoverlay=gpio-shutdown`, one button can do both off and on | The K2B's button can only power off |
 | Serial | UART on GPIO14/15 (header pins 8/10), 3.3 V | |
+| Case | Mini arcade cabinet (`hardware/rpi4-arcade-case/`): 2.4" ST7789V SPI LCD (SPI0, DC GPIO25, RES GPIO27, BLK GPIO18), power button on GPIO3, 30 mm fan. In `config.txt`: `gpio-shutdown` (volumed powers off; GPIO3 low powers on) and `mipi-dbi-spi` (panel-mipi-dbi, init file from `scripts/gen-st7789v-bin.py`). The LCD is info only (`lcdinfo`: game, IP, CPU, uptime); the launcher and RetroArch stay on HDMI. Tested 2026-10-22: LCD and button (off and on) work | |
 
 ## Layers
 
@@ -114,5 +115,5 @@ measure it first, with a stopwatch and serial timestamps (`sertime.ps1` as on th
    4.3 → 2.1 s; EEPROM bootloader updated). The ~7 s before Linux is parked: needs the firmware
    log over serial (`uart_2ndstage=1`), or a check of how long the TV takes to show the first picture.
 6. **Release sweep** (`docs/test-plan.md`), with the Pi's numbers in it.
-7. Later: onboard Bluetooth for the pad; the power button on GPIO3 (off and on); then the read-only
+7. Later: onboard Bluetooth for the pad (the power button on GPIO3 is done: 2026-10-22); then the read-only
    root back on the Zero3/K2B.

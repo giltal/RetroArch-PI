@@ -50,6 +50,22 @@ display_auto_detect=0
 dtoverlay=disable-wifi
 dtparam=krnbt=off
 
+# --- Arcade case (hardware/rpi4-arcade-case) --------------------------------
+# Power button between GPIO3 (pin 5) and GND (pin 6). gpio-shutdown makes it a
+# gpio-keys KEY_POWER, which volumed turns into a clean poweroff. GPIO3 low is
+# also what wakes a halted Pi 4, so the same button powers it back on.
+dtoverlay=gpio-shutdown
+# 2.4" ST7789V 240x320 SPI LCD, landscape, for status info only (lcdinfo):
+# games and the launcher stay on HDMI. panel-mipi-dbi (a module, so it is the
+# last DRM card, after vc4 and v3d) loads its init sequence from
+# /lib/firmware/retroopi-st7789v.bin (scripts/gen-st7789v-bin.py). Wiring:
+# SPI0 CE0, DC GPIO25, RES GPIO27, BLK GPIO18; MISO not used. With no panel
+# wired the driver writes to nothing and lcdinfo just has no one watching.
+dtoverlay=mipi-dbi-spi,spi0-0,write-only
+dtparam=compatible=retroopi-st7789v\0panel-mipi-dbi-spi
+dtparam=width=320,height=240,width-mm=49,height-mm=37
+dtparam=dc-gpio=25,reset-gpio=27,backlight-gpio=18
+
 # --- CPU ------------------------------------------------------------------
 # 1.8 GHz on boards that support it (newer Pi 4 revisions); ignored otherwise.
 arm_boost=1

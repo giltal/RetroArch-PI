@@ -50,6 +50,10 @@
  * gpio-keys-polled, reporting the same KEY_POWER. Either device is "the power
  * key"; whichever exists is watched. */
 #define GPIOKEY_NAME "gpio-keys-polled"
+/* The Pi 4's button is config.txt's gpio-shutdown overlay on GPIO3: an
+ * interrupt-driven gpio-keys device named after its DT node. Matched by
+ * substring, since the name carries the node's bus prefix ("soc:..."). */
+#define SHUTDOWN_NAME "shutdown_button"
 #define STATE_FILE  "/opt/roms/_system/state.txt"
 
 /* The launcher owns this control, so volumed MUST use the same one on the same
@@ -63,7 +67,7 @@
 #define VOL_STEP      5
 #define STORE_DELAY   5
 
-static int open_by_name(const char *want)
+static int open_by_name_match(const char *want, int substring)
 {
 	DIR *d = opendir("/dev/input");
 	struct dirent *e;
@@ -81,7 +85,8 @@ static int open_by_name(const char *want)
 		name[0] = 0;
 		/* exact match, so "...Controller" does not also catch
 		 * "...Controller Motion Sensors" */
-		if (ioctl(fd, EVIOCGNAME(sizeof name), name) >= 0 && !strcmp(name, want)) {
+		if (ioctl(fd, EVIOCGNAME(sizeof name), name) >= 0 &&
+		    (substring ? strstr(name, want) != NULL : !strcmp(name, want))) {
 			closedir(d);
 			return fd;
 		}
@@ -89,6 +94,11 @@ static int open_by_name(const char *want)
 	}
 	closedir(d);
 	return -1;
+}
+
+static int open_by_name(const char *want)
+{
+	return open_by_name_match(want, 0);
 }
 
 static int volume_pct(void)		/* read the mixer, in launcher percent */
@@ -209,6 +219,8 @@ int main(void)
 			pek = open_by_name(PEK_NAME);
 		if (pek < 0)
 			pek = open_by_name(GPIOKEY_NAME);
+		if (pek < 0)
+			pek = open_by_name_match(SHUTDOWN_NAME, 1);
 
 		if (pad >= 0) { pfd[n].fd = pad; pfd[n].events = POLLIN; pad_i = n++; }
 		if (pek >= 0) { pfd[n].fd = pek; pfd[n].events = POLLIN; pek_i = n++; }

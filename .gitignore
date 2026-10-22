@@ -2,7 +2,7 @@
 # kernels, DTBs, U-Boot. Every one is reproducible with scripts/build.sh.
 # Git stores a full copy of every changed binary, so tracking these would add
 # gigabytes per rebuild (the reference project learned this the hard way).
-firmware/
+/firmware/
 
 # ROM archives: large, regenerable, and not ours to distribute.
 backup/

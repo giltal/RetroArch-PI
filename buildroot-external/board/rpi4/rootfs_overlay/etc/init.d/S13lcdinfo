@@ -1,0 +1,47 @@
+#!/bin/sh
+#
+# lcdinfo: status page on the arcade case's SPI LCD (config.txt: mipi-dbi-spi).
+# Info only; the launcher (S12) and games stay on HDMI. lcdinfo waits for
+# udev to load panel-mipi-dbi and exits quietly if no panel appears. Stopping it
+# (poweroff) blanks the LCD and turns its backlight off.
+
+DAEMON="lcdinfo"
+PIDFILE="/var/run/$DAEMON.pid"
+
+start() {
+	[ -x "/usr/bin/$DAEMON" ] || { echo "lcdinfo: missing"; return 1; }
+	# udev cannot autoload the panel driver: an SPI device's uevent carries only
+	# "spi:<first compatible>" (spi:retroopi-st7789v), which no module claims;
+	# the driver matches the second one, panel-mipi-dbi-spi, once it is loaded.
+	# Seen on the Pi 4 (2026-10-22): spi0.0 there, no driver, LCD dark.
+	grep -qa panel-mipi-dbi-spi /sys/bus/spi/devices/*/of_node/compatible 2>/dev/null \
+		&& modprobe panel-mipi-dbi
+	printf "Starting %s: " "$DAEMON"
+	start-stop-daemon --start --background --make-pidfile \
+		--pidfile "$PIDFILE" --exec "/usr/bin/$DAEMON"
+	status=$?
+	if [ "$status" -eq 0 ]; then echo "OK"; else echo "FAIL"; fi
+	return "$status"
+}
+
+stop() {
+	printf "Stopping %s: " "$DAEMON"
+	[ -f "$PIDFILE" ] && start-stop-daemon --stop --quiet --pidfile "$PIDFILE"
+	# Give it a moment to blank the panel before the poweroff goes on.
+	i=0
+	while pidof "$DAEMON" >/dev/null 2>&1; do
+		i=$((i + 1))
+		[ "$i" -gt 5 ] && { killall -9 "$DAEMON" 2>/dev/null; break; }
+		sleep 1
+	done
+	rm -f "$PIDFILE"
+	echo "OK"
+}
+
+case "$1" in
+	start)   start;;
+	stop)    stop;;
+	restart|reload) stop; start;;
+	*) echo "Usage: $0 {start|stop|restart}"; exit 1
+esac
+exit $?

@@ -39,6 +39,15 @@ grep -q '^dtoverlay=vc4-kms-v3d-pi4.*,cma-[0-9]' "$cfg" \
 # boot (see config.txt).
 grep -q '^hdmi_ignore_hotplug=1' "$cfg" \
 	|| fail "config.txt lacks hdmi_ignore_hotplug=1 -- the TV would lock twice on every boot"
+# Every overlay config.txt loads must be on p1 (the firmware skips a missing one
+# silently), and the SPI LCD's init sequence must be where panel-mipi-dbi looks.
+for o in $(sed -n 's/^dtoverlay=\([^,]*\).*/\1/p' "$cfg"); do
+	[ -s "$FW/overlays/$o.dtbo" ] || fail "config.txt loads $o, but overlays/$o.dtbo is not on p1"
+done
+if grep -q '^dtparam=compatible=retroopi-st7789v' "$cfg"; then
+	[ -s "$TARGET_DIR/lib/firmware/retroopi-st7789v.bin" ] \
+		|| fail "no /lib/firmware/retroopi-st7789v.bin: the LCD would stay blank (scripts/gen-st7789v-bin.py)"
+fi
 # The kernel and DTB config.txt names must be the ones genimage puts on p1.
 k=$(sed -n 's/^kernel=//p' "$cfg")
 [ -n "$k" ] && [ -s "$BINARIES_DIR/$k" ] \

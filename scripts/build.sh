@@ -62,8 +62,15 @@ JLEVEL=${JLEVEL:-$(nproc)}
 # build carried a launcher without the new PSP/Dreamcast entries, and it was
 # only caught by grepping the binary. They take seconds to build, so a full build
 # always cleans them first.
+# The Pi 4's config.txt and cmdline.txt (board/rpi4) have the same problem: the
+# rpi-firmware package copies them when it installs, so an edited config.txt
+# never reached the image until that package was cleaned (2026-10-22: the
+# arcade case overlays were missing from a "successful" build).
 if [ $# -eq 0 ]; then
 	make O="$OUT" retroopi-launcher-dirclean retroopi-tools-dirclean >/dev/null
+	if grep -q '^BR2_PACKAGE_RPI_FIRMWARE=y' "$OUT/.config" 2>/dev/null; then
+		make O="$OUT" rpi-firmware-dirclean >/dev/null
+	fi
 fi
 
 echo "build.sh: $(date '+%F %T') make ${*:-all} BR2_JLEVEL=$JLEVEL (log: $LOG)"

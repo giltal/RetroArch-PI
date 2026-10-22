@@ -313,3 +313,116 @@ attached and leaves HDMI dark; vc4 detects the TV itself.
   as `*.prev` on p1.
 
 **Stopwatch after the fix: 9 s** power-on to menu (user), was ~9.5 s, with one HDMI lock instead of two.
+
+## 2026-10-21 — Mini arcade cabinet case
+
+`hardware/rpi4-arcade-case/` holds a 96 × 88 × 165 mm cabinet for the Snapmaker U1 (4 colours:
+black body, yellow trim, red and white side art). It has:
+- a 2.4" ST7789V LCD (landscape);
+- a 12 mm tactile power button on GPIO3 with a printed cap;
+- a 30 mm exhaust fan;
+- a decorative joystick, and coin slots that are the air intake.
+
+The source is `arcade_case.py`, a Fusion API script run through the Fusion MCP. Its
+parameters are at the top. It builds every part and checks them against reference models of
+the Pi 4, LCD, fan and switch (0 clashes). It exports STEP and 3MF per part, in print
+orientation with one body per colour, STL per body, and an assembly STEP.
+
+Design choices:
+- The core (all walls plus the left side) is one extrusion of the side profile, printed on
+  its left side: no supports, and the side art is in the first layers.
+- The LCD and the marquee slide into rails, and the tray hooks in at the back. The only
+  screws are 5 for the right side, 2 for the tray, 4 for the fan and 4 for the Pi.
+- The Pi lies with power, HDMI and audio at the back, USB and Ethernet on the right, and the
+  SD card in a slot on the left.
+
+Not checked yet: the LCD module's real size. The rails assume 44.0 mm across and 4.3 mm
+thick. Not done yet: the firmware side (`gpio-shutdown` on GPIO3 and a DRM driver for the
+ST7789V).
+
+## 2026-10-22 — Arcade case: GPIO3 power button and the SPI status LCD
+
+User decisions:
+- The LCD is for **info only**. Games, the launcher and audio stay on HDMI.
+- The overlays are always in `config.txt`.
+
+What changed:
+- **Power button (GPIO3, pin 5 to GND):** `dtoverlay=gpio-shutdown` makes it a gpio-keys
+  KEY_POWER device (`gpio_keys` module, loaded by udev). volumed now also watches an input
+  device whose name contains `shutdown_button` and powers off cleanly, as with the K2B's
+  key. GPIO3 low wakes a halted Pi 4, so the same button powers it on.
+- **LCD (ST7789V, 320x240 landscape):** `dtoverlay=mipi-dbi-spi,spi0-0,write-only` with
+  `compatible=retroopi-st7789v`, DC GPIO25, RES GPIO27, BLK GPIO18.
+  - panel-mipi-dbi reads its init sequence from `/lib/firmware/retroopi-st7789v.bin`
+    (36 bytes: SLPOUT, COLMOD 565, MADCTL 0x60, INVON, NORON, DISPON), written by
+    `scripts/gen-st7789v-bin.py`.
+  - If the picture is rotated, mirrored, colour-inverted or has red and blue swapped,
+    change `MADCTL`, `INVERT` or `BGR` there.
+  - All four drivers were already `=m` in `bcm2711_defconfig`; the fragment now lists them
+    with the reason.
+- **Keeping the LCD off the game screen:**
+  - As a module, the panel probes after the built-in vc4 and v3d and becomes the last DRM
+    card.
+  - The launcher also skips any card whose driver is `panel-mipi-dbi`.
+  - RetroArch takes the first card with a connected connector, which is HDMI.
+- **`lcdinfo`** (tools, started by `S13lcdinfo` in the Pi 4 overlay):
+  - draws once a second, using libdrm dumb buffers, DIRTYFB and SDL2_ttf with the
+    launcher's font;
+  - shows the running ROM and its system folder (from RetroArch's command line) or
+    "In the menu", plus the IP address, CPU temperature, clock and load, and uptime;
+  - exits if no panel appears within 60 s;
+  - on stop it blanks the panel and sets the backlight's `bl_power` to off.
+- **`post-build` (bcm2711):** fails if any overlay in `config.txt` is missing from p1, or if
+  the LCD init file is missing.
+- **`build.sh` trap:** the first "OK" build shipped the **old** `config.txt`. The
+  rpi-firmware package copies `config.txt` and `cmdline.txt` when it installs, so edits
+  never reached the image. A full build now dircleans rpi-firmware too, as it already did
+  the local packages.
+
+**Tested on the Pi 4 with the LCD and button wired (same day):**
+- **The LCD stayed dark at first.** An SPI device's uevent carries only
+  `MODALIAS=spi:<first compatible>` (`spi:retroopi-st7789v`), which no module claims, so
+  udev never loaded panel-mipi-dbi. The driver matches the second compatible once it is
+  loaded: `modprobe panel-mipi-dbi` brought it up as card2 with the init file accepted.
+  `S13lcdinfo` now loads it when an SPI device lists `panel-mipi-dbi-spi`. After a reboot
+  the panel is up at 1.4 s, and lcdinfo draws.
+- **The picture is right** (user-checked): landscape, correct colours, with the defaults
+  (MADCTL 0x60, INVON).
+- **The launcher stays on HDMI:** `DRM: using /dev/dri/card0`.
+- **The button works:** the input device is `soc:shutdown_button@3` (event4), and volumed
+  opens it. The user pressed it once: clean poweroff (`KEY_POWER seen at uptime 20.67`, no
+  ext4/FAT recovery on the next boot), the LCD blanked. A second press booted the Pi back
+  to the menu.
+- **Aside (not from this change):** volumed does not open this USB pad. It is named
+  "PS3 Controller", not "Sony PLAYSTATION(R)3 Controller", so PS + d-pad volume does not
+  work with it on the Pi 4.
+
+**Regression found the same evening: no game started.**
+- **Cause:** RetroArch's KMS context (`gfx/drivers_context/drm_ctx.c`) lists `/dev/dri` in
+  readdir order and takes the first card with a connected connector. The LCD's card2 came
+  before vc4's card0, so every game opened on the 320x240 panel and exited ("Did not find
+  suitable video mode for 1920 x 1080"). The launcher's guard did not cover RetroArch, and
+  the hardware test above only checked the launcher.
+- **Quick fix on the board:** the LCD lines in p1's `config.txt` are commented out (backup
+  `config.txt.lcd-on` on p1), and `panel_mipi_dbi` is unloaded. Mario Kart 64 quick start
+  runs again (user).
+- **Proper fix:** RetroArch patch `0010-drm-ctx-never-take-a-status-panel.patch` skips
+  panel-mipi-dbi cards in `gfx_ctx_drm_init()`. Built (with Flycast, so the Pi 4 now has the
+  0007 threaded-AICA race fix too), synced, LCD lines restored in `config.txt`, rebooted.
+  The log shows `[KMS]: Skipping /dev/dri/card2 (status panel).` and then 1920x1080 on
+  HDMI. Mario Kart 64 quick start runs (user).
+
+**lcdinfo now shows the cover art.**
+- The layout: the cover is on the left (fitted in 90x100), with the system and the game's
+  name wrapped over up to three lines beside it. IP, CPU and uptime are below a yellow
+  line.
+- The art is found the way the launcher finds it: `thumbnails/<system folder>/<game>.jpg`
+  or `.png`, with the folder's name for a game kept in its own folder.
+- **Bug found while testing:** nothing showed during a game, because `/usr/bin/retroarch`
+  is a wrapper that execs `retroarch.bin`, so the process name is `retroarch.bin`.
+  lcdinfo now accepts both names.
+- User-checked during Mario Kart 64: cover, system and name are shown.
+- **Per-core load:** the bottom line has one bar per core with its %, red at 90% or more.
+  It sits under `CPU <temp> <clock> avg N%`, and IP and uptime now share the first line.
+  The average alone hid a maxed-out emulator thread (one full core of four reads 25%).
+  User-checked.
