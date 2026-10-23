@@ -10,7 +10,7 @@ FILE_DESCRIPTION(
 
 FILE_NAME(
 /* name */ 'ButtonCap.step',
-/* time_stamp */ '2026-10-21T15:57:57+03:00',
+/* time_stamp */ '2026-10-23T10:53:56+03:00',
 /* author */ (''),
 /* organization */ (''),
 /* preprocessor_version */ 'ST-DEVELOPER v20.2',
@@ -198,7 +198,7 @@ SOLID_ANGLE_UNIT()
 #147=PRODUCT_DEFINITION_SHAPE('',$,#150);
 #148=SHAPE_REPRESENTATION('',(#85),#140);
 #149=PRODUCT_DEFINITION_CONTEXT('part definition',#154,'design');
-#150=PRODUCT_DEFINITION('2026-10-21-15-57-57-187','ButtonCap',#151,#149);
+#150=PRODUCT_DEFINITION('2026-10-23-10-53-56-364','ButtonCap',#151,#149);
 #151=PRODUCT_DEFINITION_FORMATION('',$,#156);
 #152=PRODUCT_RELATED_PRODUCT_CATEGORY('ButtonCap','ButtonCap',(#156));
 #153=APPLICATION_PROTOCOL_DEFINITION('international standard',
@@ -206,7 +206,7 @@ SOLID_ANGLE_UNIT()
 #154=APPLICATION_CONTEXT(
 'Core Data for Automotive Mechanical Design Process');
 #155=PRODUCT_CONTEXT('part definition',#154,'mechanical');
-#156=PRODUCT('2026-10-21-15-57-57-187','ButtonCap',$,(#155));
+#156=PRODUCT('2026-10-23-10-53-56-364','ButtonCap',$,(#155));
 #157=PRESENTATION_STYLE_ASSIGNMENT((#159));
 #158=PRESENTATION_STYLE_ASSIGNMENT((#160));
 #159=SURFACE_STYLE_USAGE(.BOTH.,#161);

@@ -459,3 +459,26 @@ exits cleanly on the Pi 4.
   renames the process (`comm` = `Main`), so lcdinfo's process-name check missed it. It now
   identifies RetroArch by its program (`/proc/<pid>/exe` = `retroarch.bin`), which no core
   can rename. User-checked with a PSP game: system, name and cover shown.
+
+## 2026-10-23 — Arcade case version 2: the Pi was mirrored; left door; LCD slot; threads
+
+The user found that a real Pi 4 in the case faced its HDMI and power **into** the cabinet.
+Version 1 placed the board with USB/Ethernet on the right *and* USB-C/HDMI at the back. Seen
+from above, a real Pi 4 with USB on the right has HDMI toward you, so that layout needs a
+mirror-image board.
+
+Version 2 (`hardware/rpi4-arcade-case/arcade_case.py`):
+- **The Pi is turned 180°:** USB-C/HDMI/audio at the back, USB/Ethernet on the left, SD card
+  on the right. The tray's standoffs and tongue moved to match. Checked against the
+  reference model from the back: USB-C, HDMI0, HDMI1, audio, in a real board's order.
+- **The left side is a door like the right one:** 5 countersunk M3 screws each, art on each
+  door. The core is the walls only, printed on its edge.
+  - The USB/Ethernet opening is in the left door, the SD slot in the right door.
+- **LCD slot:** exactly 47.2 mm across the rails and 5.9 mm deep, the user's measurement with
+  no clearance added.
+- **Modeled threads:** M3 in both ends of the five door tubes (12 mm) and in the tray ledge,
+  M2.5 in the Pi standoffs. The design switches from direct to parametric after the build
+  so Fusion's thread feature can run.
+  - The top-back tube failed to thread. It touched the top wall only along a line (tangent),
+    a sliver. All five tubes now sink 0.5 mm into their walls.
+- Fit check: 0 clashes. 16 threads. Same 96 × 88 × 165 mm.

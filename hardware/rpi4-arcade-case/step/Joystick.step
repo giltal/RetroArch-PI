@@ -10,7 +10,7 @@ FILE_DESCRIPTION(
 
 FILE_NAME(
 /* name */ 'Joystick.step',
-/* time_stamp */ '2026-10-21T15:57:57+03:00',
+/* time_stamp */ '2026-10-23T10:53:57+03:00',
 /* author */ (''),
 /* organization */ (''),
 /* preprocessor_version */ 'ST-DEVELOPER v20.2',
@@ -233,7 +233,7 @@ SOLID_ANGLE_UNIT()
 #182=PRODUCT_DEFINITION_SHAPE('',$,#185);
 #183=SHAPE_REPRESENTATION('',(#105),#175);
 #184=PRODUCT_DEFINITION_CONTEXT('part definition',#189,'design');
-#185=PRODUCT_DEFINITION('2026-10-21-15-57-57-417','Joystick',#186,#184);
+#185=PRODUCT_DEFINITION('2026-10-23-10-53-57-496','Joystick',#186,#184);
 #186=PRODUCT_DEFINITION_FORMATION('',$,#191);
 #187=PRODUCT_RELATED_PRODUCT_CATEGORY('Joystick','Joystick',(#191));
 #188=APPLICATION_PROTOCOL_DEFINITION('international standard',
@@ -241,7 +241,7 @@ SOLID_ANGLE_UNIT()
 #189=APPLICATION_CONTEXT(
 'Core Data for Automotive Mechanical Design Process');
 #190=PRODUCT_CONTEXT('part definition',#189,'mechanical');
-#191=PRODUCT('2026-10-21-15-57-57-417','Joystick',$,(#190));
+#191=PRODUCT('2026-10-23-10-53-57-496','Joystick',$,(#190));
 #192=PRESENTATION_STYLE_ASSIGNMENT((#194));
 #193=PRESENTATION_STYLE_ASSIGNMENT((#195));
 #194=SURFACE_STYLE_USAGE(.BOTH.,#196);

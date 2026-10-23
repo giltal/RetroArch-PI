@@ -1,12 +1,17 @@
 """RetroArch-PI mini arcade cabinet for the Raspberry Pi 4 (Fusion API script).
 
 Run inside Fusion (Scripts and Add-Ins, or the Fusion MCP "script" call). It creates a new
-direct-modelling design, builds every part, checks the parts against reference models of
-the Pi 4, LCD, fan and switch, and exports STEP / 3MF / STL into OUT.
+parametric design, builds every part (as base-feature bodies), models the screw threads,
+checks the parts against reference models of the Pi 4, LCD, fan and switch, and exports
+STEP / 3MF / STL into OUT.
 
 All dimensions are in mm (the Fusion API works in cm: see P() and mm()).
 Frame: X = depth (0 = front of the control panel, + to the back), Y = up, Z = width
-(0 = inner face of the left side, + to the right). The side profile lies in the XY plane.
+(0 = inner face of the left side, + to the right, the player's right). The side profile
+lies in the XY plane.
+
+The core (all walls) is open on both sides; the left and right sides are doors screwed into
+five tubes that run across the width, with threaded holes at both ends.
 
 Printing (Snapmaker U1, 4 colours): black body, yellow trim, red and white art. Each part
 that has more than one colour is one STEP/3MF with one body per colour.
@@ -30,8 +35,9 @@ PROFILE = [(8, 0), (8, 46), (0, 46), (0, 58), (42, 63), (42, 70), (56, 128),
 # LCD: ST7789V 2.4" 240x320, mounted landscape. Panel 60.26 x 42.72, active 48.96 x 36.72.
 LCD_ACTIVE_W, LCD_ACTIVE_H = 48.96, 36.72
 LCD_GLASS_W, LCD_GLASS_H = 60.26, 42.72
-LCD_MOD_H = 44.0      # module height across the rails (largest of PCB and glass)
-LCD_MOD_T = 4.3       # glass front to PCB back (components on the back excluded)
+# The slot between the rails, exactly (the user's module, measured: no clearance added).
+LCD_MOD_H = 47.2      # module height across the rails
+LCD_MOD_T = 5.9       # glass front to the back of the module
 LCD_MOD_W = 71.0      # only used by the reference model
 LCD_Z = W_IN / 2      # screen centre across the width
 
@@ -47,12 +53,22 @@ FAN_Y, FAN_Z = 56.0, 45.0     # fan centre on the back wall
 
 TRAY_T = 3.0
 STANDOFF_H = 7.0              # Pi PCB bottom at TRAY_T + STANDOFF_H
+# The Pi lies components up, turned so that USB-C/HDMI/audio face the back: seen from above
+# with the cabinet's front towards you, its USB/Ethernet are on the left and the SD card on
+# the right. (The first version had USB on the right AND HDMI at the back, which only a
+# mirror-image board can do; a real Pi 4 then faced its HDMI and power into the cabinet.)
 PI_BACK_X = 84.5              # Pi edge with USB-C/HDMI/audio (1 mm from the back wall)
-PI_LEFT_Z = 2.0               # Pi edge with the SD card
+PI_SD_Z = W_IN - 2.0          # Pi edge with the SD card (right); USB/Ethernet reach Z ~ 0
 
-TUBES = [(13.5, 16), (82.5, 32), (82.5, 120), (70.5, 159.5), (5.5, 51.5)]  # side screws
-TUBE_R, PILOT_R = 3.0, 1.25   # M3 self-tapping into 2.5 mm pilots
+# Door screw tubes. Each sinks 0.5 mm into the walls it leans on: a tube that only touched
+# a wall (tangent) left a knife-edge sliver there, and Fusion could not thread the hole.
+TUBES = [(13.0, 16), (83.0, 32), (83.0, 120), (70.5, 160), (5.0, 51.0)]
+TUBE_R, PILOT_R = 3.0, 1.25   # tube; hole before threading
+TUBE_HOLE = 12.0              # threaded depth at each end of a tube
 TRAY_SCREWS = [(14, 12), (14, 78)]  # (X, Z), into the kick panel ledge
+# Modeled threads (Fusion rebuilds each hole to the thread's profile):
+THREAD_M3, THREAD_M25 = 'M3x0.5', 'M2.5x0.45'
+STANDOFF_HOLE_R = 1.05        # Pi standoffs, threaded M2.5
 
 COLORS = {'Black': (30, 30, 32), 'Red': (210, 30, 40), 'White': (240, 240, 235),
           'Yellow': (250, 200, 20), 'Ref': (60, 140, 80), 'RefPCB': (20, 110, 50),
@@ -76,6 +92,10 @@ def V(x, y, z=0.0):
 
 
 def box(x0, x1, y0, y1, z0, z1):
+    """Axis-aligned box; each pair may come in either order."""
+    x0, x1 = sorted((x0, x1))
+    y0, y1 = sorted((y0, y1))
+    z0, z1 = sorted((z0, z1))
     c = P((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2)
     obb = adsk.core.OrientedBoundingBox3D.create(c, V(1, 0, 0), V(0, 1, 0),
                                                  mm(x1 - x0), mm(y1 - y0), mm(z1 - z0))
@@ -236,9 +256,9 @@ def build():
 
     parts = {}
 
-    # Core: the profile walls plus the left side, open at the bottom and on the right.
-    core = prism(PROFILE, -SIDE, W_IN)
-    op(core, prism(inner, 0, W_IN + 1), 'cut')
+    # Core: the profile walls only, open at the bottom and on both sides (the doors).
+    core = prism(PROFILE, 0, W_IN)
+    op(core, prism(inner, -1, W_IN + 1), 'cut')
 
     # The tray goes in from below with the Pi on it: its back tongue hooks into a groove in
     # the back wall, then two screws hold the front to a ledge on the kick panel. Nothing
@@ -248,13 +268,18 @@ def build():
     scr, mq, deck = W['screen'], W['marquee'], W['deck']
     lcd_sc = scr.L / 2
     mq_sc = mq.L / 2
-    for poly in scr.hooks(lcd_sc, LCD_MOD_H, LCD_MOD_T + 0.4) + mq.hooks(mq_sc, MARQ_H, MARQ_T + 0.4):
+    # The LCD slot is exactly LCD_MOD_H x LCD_MOD_T (measured on the module); the marquee
+    # plate keeps 0.3/0.4 mm of play.
+    for poly in (scr.hooks(lcd_sc, LCD_MOD_H, LCD_MOD_T, clr=0.0) +
+                 mq.hooks(mq_sc, MARQ_H, MARQ_T + 0.4)):
         feats.append(prism(poly, 0, W_IN))
     for f in feats:
         op(core, f, 'join')
-    op(core, prism(PROFILE, -SIDE - 1, W_IN), 'int')   # nothing pokes out of the outline
+    op(core, prism(PROFILE, -1, W_IN), 'int')          # nothing pokes out of the outline
 
-    cuts = [zcyl(x, y, PILOT_R, 10, W_IN + 1) for x, y in TUBES]
+    # Door screws: a hole at each end of every tube, threaded M3 later (thread_holes()).
+    cuts = [zcyl(x, y, PILOT_R, z0, z1) for x, y in TUBES
+            for z0, z1 in [(-1, TUBE_HOLE), (W_IN - TUBE_HOLE, W_IN + 1)]]
     for x, z in TRAY_SCREWS:
         cuts.append(cyl((x, TRAY_T - 0.1, z), (x, TRAY_T + 4.1, z), PILOT_R))
     cuts.append(box(85.3, 87.2, 1.3, 3.3, -1, W_IN + 1))              # groove for the tray tongue
@@ -273,11 +298,12 @@ def build():
         e = abs(4 * k) + 1.2
         half = math.sqrt(max(13.5 ** 2 - e ** 2, 0))
         cuts.append(box(84, 90, FAN_Y + 4 * k - 1.2, FAN_Y + 4 * k + 1.2, FAN_Z - half, FAN_Z + half))
-    # Ports: USB-C, 2x micro-HDMI, audio at the back; SD card on the left (open at the bottom).
-    pz = lambda x: PI_LEFT_Z + x
+    # Pi board coordinates (x along the 85 mm edge from the SD end, y across from the
+    # USB-C/HDMI edge) to the cabinet: turned 180 degrees, components up (see PI_SD_Z).
+    pz = lambda x: PI_SD_Z - x
     px = lambda y: PI_BACK_X - y
+    # Ports at the back: USB-C, 2x micro-HDMI, audio (open at the bottom for the tray).
     cuts.append(box(84, 90, -1, 20, pz(4), pz(60)))
-    cuts.append(box(px(37), px(19), -1, 13, -SIDE - 1, 0.01))
     # Coin door on the kick panel: groove outline and two coin slots (air intake).
     g = box(7, 8.8, 10, 36, W_IN / 2 - 17, W_IN / 2 + 17)
     op(g, box(6, 9, 11, 35, W_IN / 2 - 16, W_IN / 2 + 16), 'cut')
@@ -302,42 +328,48 @@ def build():
         op(stripes['Yellow'], trim, 'join')
         return {'Yellow': stripes['Yellow'], 'Red': stripes['Red'], 'White': stripes['White']}
 
-    left_art = art(-SIDE, -SIDE + 0.6)
-    for b in left_art.values():
-        op(core, b, 'cut')
-    sd = box(px(37), px(19), -1, 13, -SIDE - 1, 0.01)
-    for b in left_art.values():
-        op(b, sd, 'cut')
-    # Print orientation: left side on the bed (art face down).
-    parts['Core'] = (mat((0, 0, SIDE)), [('Core', core, 'Black')] +
-                     [('Core_Art_' + k, b, k) for k, b in left_art.items()])
+    # Print orientation: lying on its left edge (the walls stand up, no supports).
+    parts['Core'] = (mat((0, 0, 0)), [('Core', core, 'Black')])
 
-    # Right side: screws into the tubes, USB/Ethernet opening open at the bottom.
-    right = prism(PROFILE, W_IN, W_IN + SIDE)
-    right_art = art(W_IN + SIDE - 0.6, W_IN + SIDE)
-    rcuts = [box(px(55), px(1), -1, 28.5, W_IN - 1, W_IN + SIDE + 1)]
-    for x, y in TUBES:
-        rcuts.append(zcyl(x, y, 1.7, W_IN - 1, W_IN + SIDE + 1))
-        rcuts.append(cyl((x, y, W_IN + SIDE - 1.55), (x, y, W_IN + SIDE + 0.01), 1.7, 3.26))
-    for c in rcuts:
-        op(right, c, 'cut')
-    for b in right_art.values():
-        op(right, b, 'cut')
-        for c in rcuts:
-            op(b, c, 'cut')
+    # The doors: each side screws into the five tubes (countersunk M3), with its art inlaid in
+    # the outer face and an opening, open at the bottom, for what the Pi has on that side:
+    # USB/Ethernet on the left, the SD card on the right.
+    def door(name, z_in, z_out, opening):
+        lo, hi = sorted((z_in, z_out))
+        panel = prism(PROFILE, lo, hi)
+        face = z_out
+        inward = 1 if z_in > z_out else -1        # from the outer face into the cabinet
+        art_b = art(*sorted((face, face + inward * 0.6)))
+        dcuts = [opening]
+        for x, y in TUBES:
+            dcuts.append(zcyl(x, y, 1.7, lo - 1, hi + 1))
+            dcuts.append(cyl((x, y, face + inward * 1.55), (x, y, face - inward * 0.01), 1.7, 3.26))
+        for c in dcuts:
+            op(panel, c, 'cut')
+        for b in art_b.values():
+            op(panel, b, 'cut')
+            for c in dcuts:
+                op(b, c, 'cut')
+        return [(name, panel, 'Black')] + [(f'{name}_Art_{k}', b, k) for k, b in art_b.items()]
+
     top_y = max(p[1] for p in PROFILE)
+    parts['SideLeft'] = (mat((0, 0, SIDE)),                                       # art face down
+                         door('SideLeft', 0, -SIDE, box(px(55), px(1), -1, 28.5, -SIDE - 1, 1)))
     parts['SideRight'] = (mat((0, top_y, W_IN + SIDE), (1, 0, 0), (0, -1, 0), (0, 0, -1)),   # art face down
-                          [('SideRight', right, 'Black')] +
-                          [('SideRight_Art_' + k, b, k) for k, b in right_art.items()])
+                          door('SideRight', W_IN, W_IN + SIDE,
+                               box(px(37), px(19), -1, 13, W_IN - 1, W_IN + SIDE + 1)))
 
-    # Tray: Pi standoffs, vents, feet recesses; four countersunk M3 screws into the ledges.
+    # Tray: Pi standoffs (threaded M2.5), vents, feet recesses; two countersunk M3 screws
+    # into the kick panel ledge, and a tongue into the back wall's groove.
     tray = box(10.7, 85.3, 0, TRAY_T, 0.2, W_IN - 0.2)
     holes = [(3.5, 3.5), (61.5, 3.5), (3.5, 52.5), (61.5, 52.5)]
     for hx, hy in holes:
         op(tray, cyl((px(hy), TRAY_T - 0.1, pz(hx)), (px(hy), TRAY_T + STANDOFF_H, pz(hx)), 3.0), 'join')
     for hx, hy in holes:
-        op(tray, cyl((px(hy), TRAY_T + 1, pz(hx)), (px(hy), TRAY_T + STANDOFF_H + 1, pz(hx)), 1.1), 'cut')
-    for z0, z1 in [(0.5, 5.0), (63.0, 89.5)]:                          # tongue (outside the port opening)
+        op(tray, cyl((px(hy), TRAY_T + 1, pz(hx)), (px(hy), TRAY_T + STANDOFF_H + 1, pz(hx)),
+                     STANDOFF_HOLE_R), 'cut')
+    port_z = sorted((pz(4), pz(60)))                                   # the back port opening
+    for z0, z1 in [(0.5, port_z[0] - 1.5), (port_z[1] + 1.5, W_IN - 0.5)]:   # tongue beside it
         op(tray, box(85.0, 86.9, 1.5, TRAY_T, z0, z1), 'join')
     for x, z in TRAY_SCREWS:
         op(tray, cyl((x, -1, z), (x, TRAY_T + 1, z), 1.7), 'cut')
@@ -478,6 +510,35 @@ def appearances(design):
     return out
 
 
+def thread_holes(comp, body_name, radius, designation):
+    """Model an internal ISO metric thread (6H) in every hole of radius `radius` (mm) in the
+    named body. Fusion rebuilds each hole to the thread's profile. Returns the hole count."""
+    body = comp.bRepBodies.itemByName(body_name)
+    faces = adsk.core.ObjectCollection.create()
+    for f in body.faces:
+        if f.geometry.surfaceType == adsk.core.SurfaceTypes.CylinderSurfaceType and \
+                abs(adsk.core.Cylinder.cast(f.geometry).radius - mm(radius)) < 1e-4:
+            faces.add(f)
+    if not faces.count:
+        raise RuntimeError(f'no {2 * radius} mm holes in {body_name}')
+    tf = comp.features.threadFeatures
+    failed = []
+    for i in range(faces.count):     # one feature per hole: a failure names its hole
+        f = faces.item(i)
+        c = adsk.core.Cylinder.cast(f.geometry).origin
+        try:
+            inp = tf.createInput(f, tf.createThreadInfo(True, 'ISO Metric profile', designation, '6H'))
+            inp.isModeled = True
+            inp.isFullLength = True
+            tf.add(inp)
+        except RuntimeError as e:
+            failed.append('(%.1f, %.1f, %.1f): %s' % (c.x * 10, c.y * 10, c.z * 10, str(e)[:90]))
+    if failed:
+        raise RuntimeError(f'{body_name}: {len(failed)} of {faces.count} threads failed (print frame):\n  '
+                           + '\n  '.join(failed))
+    return faces.count
+
+
 def run(_context):
     # Close the documents earlier runs of this script made; never touch any other.
     for i in range(app.documents.count - 1, -1, -1):
@@ -522,6 +583,13 @@ def run(_context):
     occ.component.name = 'Reference (not printed)'
     for name, body, color in ref:
         add(occ.component, name, body, color)
+
+    # Threads are features, which need a parametric design: switch now (Fusion wraps the
+    # bodies built so far into a base feature per component), then thread the screw holes.
+    design.designType = adsk.fusion.DesignTypes.ParametricDesignType
+    print('threads: %d M3 in the core (door tubes, tray ledge), %d M2.5 in the tray (Pi)' % (
+        thread_holes(comps['Core'], 'Core', PILOT_R, THREAD_M3),
+        thread_holes(comps['Tray'], 'Tray', STANDOFF_HOLE_R, THREAD_M25)))
 
     # Self-test of the clash check below: two 10 mm cubes overlapping by half.
     t = box(0, 10, 0, 10, 0, 10)
