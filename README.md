@@ -4,17 +4,23 @@ Retro gaming console firmware for small ARM boards, on **HDMI at 1080p**.
 It boots straight into a custom DRM/KMS launcher; RetroArch runs on the GPU
 with 21 emulator cores, from NES to PSP and Dreamcast.
 
-Buildroot 2026.02.3 and mainline Linux 6.18.53. One source tree builds every
-supported board: everything above the board layer (launcher, RetroArch, cores,
-init scripts, tools) is shared, so a fix made for one board reaches all of them.
+![The launcher's main menu, 1920×1080, captured from the HDMI output](docs/images/launcher-menu.png)
+
+Buildroot 2026.02.3. One source tree builds every supported board: everything
+above the board layer (launcher, RetroArch, cores, init scripts, tools) is
+shared, so a fix made for one board reaches all of them.
 
 ## Supported boards
 
 | Board | SoC / GPU | RAM | Status |
 |---|---|---|---|
-| **Orange Pi Zero3** | Allwinner H618, 4× Cortex-A53, Mali-G31 MP2 | 2 GB LPDDR4 | **Working.** The reference board: every system and setting below was measured on it |
-| **KickPi K2B V2.2** | Allwinner H618, 4× Cortex-A53, Mali-G31 MP2 | 2 GB DDR3 | **Working.** Boots to the launcher; HDMI video and audio, GPU, Gigabit Ethernet, ROM card, power button (clean shutdown). Same SoC as the Zero3, so the emulation results carry over. DualShock 3 over Bluetooth not yet re-tested |
-| Raspberry Pi 4 | Broadcom BCM2711, 4× Cortex-A72, V3D 4.2 | 1–8 GB | **In progress.** Builds; first boot next; see [docs/boards/rpi4.md](docs/boards/rpi4.md) |
+| **Orange Pi Zero3** | Allwinner H618, 4× Cortex-A53, Mali-G31 MP2 | 2 GB LPDDR4 | **Working.** The reference board: most settings were first measured on it |
+| **KickPi K2B V2.2** | Allwinner H618, 4× Cortex-A53, Mali-G31 MP2 | 2 GB DDR3 | **Working.** HDMI video and audio, GPU, Gigabit Ethernet, ROM card, power button (clean shutdown). Same SoC as the Zero3, so the emulation results carry over |
+| **Raspberry Pi 4** | Broadcom BCM2711, 4× Cortex-A72, V3D 4.2 | 1–8 GB | **Working.** Menu ~9 s after power-on; game tests pass (Dreamcast, N64, PlayStation, PSP). Power button on GPIO3 (off and on), SPI status LCD, and its own [arcade cabinet](#the-arcade-cabinet-raspberry-pi-4). See [docs/boards/rpi4.md](docs/boards/rpi4.md) |
+
+The Allwinner boards run mainline Linux 6.18.53 with Armbian's HDMI patches;
+the Pi 4 runs the Raspberry Pi kernel (`rpi-6.18.y`, 6.18.57), whose firmware
+overlays it uses.
 
 **KickPi K2B: only the V2.2 is supported** (DDR3, Maxio MAE0621A Ethernet PHY).
 The V1 (LPDDR4, RTL8211F) needs a different U-Boot DRAM setup. eMMC is not
@@ -24,25 +30,55 @@ supported; the K2B boots and runs from microSD.
 
 | | |
 |---|---|
-| **Display** | HDMI 1920×1080 (1280×720 as a build option). The launcher picks the matching TV mode and scales its layout to it |
-| **Controller** | DualShock 3, wired, or over Bluetooth via a USB dongle (the boards' onboard Wi-Fi/BT has no mainline driver) |
-| **Storage** | One microSD card: system partition plus an **exFAT ROM partition**, readable and writable from Windows. Boot the card once after flashing: the console creates a folder per system and a README on it |
+| **Display** | HDMI 1920×1080 (1280×720 as a build option). The launcher picks the matching TV mode and scales its layout to it. On the Pi 4, an optional 2.4" SPI LCD shows a status page (below); games stay on HDMI |
+| **Controller** | DualShock 3, wired, or over Bluetooth via a USB dongle (the onboard Wi-Fi/BT is not used) |
+| **Storage** | One microSD card: system partition plus an **exFAT ROM partition**, readable and writable from Windows. Boot the card once after flashing: the console creates a folder per system and a README on it. Saves, save states and the shader cache live on the ROM partition; nothing is written to the system partition during play |
 | **Network** | Onboard Ethernet, for SSH access during development. Not needed to play |
-| **Power** | Zero3: power off from the launcher's Settings. K2B: the inner button shuts down cleanly; power on by replugging |
+| **Power** | Zero3: power off from the launcher's Settings. K2B: the inner button shuts down cleanly; power on by replugging. Pi 4: a button on GPIO3 shuts down cleanly **and** powers back on |
 
 ## What it does
 
 | | |
 |---|---|
 | **Systems** | NES, SNES, Game Boy / Color / Advance, Genesis, Master System, Game Gear, PC Engine, SuperGrafx, Atari 2600 / 7800 / 800 / 5200, ZX Spectrum, Neo Geo / CPS / arcade, Doom, PlayStation, Nintendo 64, **PSP** (PPSSPP), **Dreamcast** (Flycast) |
-| **GPU** | Mali-G31 via Mesa panfrost, GLES 3.1. RetroArch `gl` driver on KMS/GBM |
+| **GPU** | Mali-G31 via Mesa panfrost (H618), V3D via Mesa v3d (Pi 4); GLES 3.1. RetroArch `gl` driver on KMS/GBM |
 | **Audio** | HDMI, with a software volume control the launcher and in-game hotkeys share |
-| **Launcher** | Jump-to-letter, favourites, recents, save-state slots, search, themes. Full game titles for arcade (from the emulators' own game lists) and PSP (read from the disc). A tap of PS shows every control |
+| **Launcher** | Jump-to-letter, favourites, recents, save-state slots and a quick start from a bookmarked state, search, themes, **cover art** next to the game list. Full game titles for arcade (from the emulators' own game lists) and PSP (read from the disc). A tap of PS shows every control |
+| **CPU** | Full clock during games (no audio dropouts from late clock ramps); the menu lets the clock drop |
 
 Measured on the H618 boards: NES, PlayStation and Nintendo 64 run smoothly; PSP
 is playable, including heavy titles like Assassin's Creed Bloodlines (99% speed
 with auto frameskip); Dreamcast runs Sonic Adventure 2 at roughly 85–90%,
-limited by one CPU core rather than the GPU.
+limited by one CPU core rather than the GPU. The Pi 4's A72 cores are roughly
+twice as fast per clock; its game tests run at 99–101% speed.
+
+**Cover art** is fetched onto the ROM card by
+[`scripts/fetch-thumbnails.py`](scripts/fetch-thumbnails.py) from the libretro
+thumbnail server. Games are matched by name and, when the file name is not the
+official one, by the ROM's checksum against the libretro database. The artwork
+is never stored in this repository.
+
+## The arcade cabinet (Raspberry Pi 4)
+
+| | |
+|---|---|
+| ![The cabinet, front left](hardware/rpi4-arcade-case/preview/front-left.png) | ![With the left door off: the Pi's USB/Ethernet, the LCD in its rails, the fan](hardware/rpi4-arcade-case/preview/inside.png) |
+
+A 96 × 88 × 165 mm mini arcade cabinet, printed in four colours (Snapmaker U1),
+in [`hardware/rpi4-arcade-case/`](hardware/rpi4-arcade-case/):
+
+- a **2.4" ST7789V SPI LCD** in the screen position. It shows a status page:
+  the game being played with its cover art, IP address, CPU temperature, clock
+  and per-core load, uptime (`lcdinfo`);
+- a working **power button** (GPIO3: clean shutdown and power on), a decorative
+  joystick, a 30 mm exhaust fan, and coin slots that are the air intake;
+- two screw-on side doors with inlaid side art, a removable tray for the Pi,
+  modeled screw threads, and slide-in rails for the LCD and the marquee.
+
+The whole design is one parametric Fusion API script, `arcade_case.py`, which
+also exports the STEP, 3MF and STL files (one body per colour) and checks the
+parts against models of the Pi, LCD, fan and switch. Wiring, printing and
+assembly: [its README](hardware/rpi4-arcade-case/README.md).
 
 ## Images
 
@@ -50,7 +86,7 @@ Ready-to-flash images and cover art are shared separately (not in this
 repository): *link to follow*. Flash with Etcher or Rufus; see
 [docs/flashing.md](docs/flashing.md). You supply your own ROMs and BIOS files.
 
-## Why the kernel carries patches
+## Why the H618 kernel carries patches
 
 Mainline Linux still has no HDMI for the H616/H618. The display engine driver
 is there; the HDMI PHY, the TV timing controller and every display node are
@@ -68,25 +104,39 @@ Mesa's panfrost needs it.
 ```bash
 scripts/build.sh zero3        # Orange Pi Zero3
 scripts/build.sh k2b          # KickPi K2B V2.2
+scripts/build.sh rpi4         # Raspberry Pi 4
 ```
+
+## Testing
+
+[docs/test-plan.md](docs/test-plan.md) is the release checklist. Two scripts do
+the work on a board over SSH, playing on its TV:
+
+- `scripts/release-test.sh <board>`: a sweep that starts a few games per heavy
+  emulator and checks they load, stay up and keep their sound at full speed.
+- `scripts/game-test.sh <board>`: real gameplay from a save state, driven by a
+  virtual DualShock 3, with screenshots, speed and sound level checked.
 
 ## Repository layout
 
 ```
 buildroot-external/
   configs/              one defconfig per board
-  package/              shared: RetroArch + cores, launcher, tools
+  package/              shared: RetroArch + cores (and their patches), launcher, tools
   board/common/         shared: rootfs overlay, kernel fragment, post-build/post-image
   board/h616/           shared by the Allwinner H616/H618 boards: kernel patches,
                         kernel and U-Boot fragments, genimage, boot-chain checks
   board/bcm2711/        Raspberry Pi 4 family: kernel fragment, boot-chain checks
   board/opi-zero3/      Zero3 only: DT patches, extlinux.conf, PHY driver
   board/kickpi-k2b/     K2B only: DT + PHY patches, U-Boot (DDR3), extlinux.conf
-  board/rpi4/           Pi 4 only: config.txt, cmdline.txt, genimage, fstab
+  board/rpi4/           Pi 4 only: config.txt, cmdline.txt, genimage, fstab, LCD init
 launcher/               the launcher (C, DRM/KMS + SDL2_ttf)
-tools/                  volumed, inject-input, seed-credit, core-info
-scripts/                build.sh / board.sh <board>, boards.sh (the board table)
-docs/                   flashing, per-board notes, development logs
+tools/                  volumed (volume, power button), lcdinfo (status LCD),
+                        inject-input / inject-pad (virtual keyboard and DS3), core-info
+hardware/               the Pi 4 arcade cabinet (Fusion script, STEP/3MF/STL)
+scripts/                build.sh, board.sh, sync-rootfs.sh <board>; boards.sh (the board table);
+                        release and game tests; fetch-thumbnails.py; gen-*.py
+docs/                   flashing, test plan, per-board notes, development logs
 ```
 
 ## Licence
@@ -95,4 +145,4 @@ GPL-2.0-or-later. See [LICENSE](LICENSE) and [NOTICE](NOTICE).
 
 Buildroot, Linux, U-Boot, TF-A, Mesa, RetroArch and the libretro cores are
 fetched from their own upstreams at pinned revisions and remain under their
-own licences. No ROMs or BIOS images are distributed here.
+own licences. No ROMs, BIOS images or cover art are distributed here.

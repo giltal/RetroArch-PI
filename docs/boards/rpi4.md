@@ -1,9 +1,10 @@
-# Board — Raspberry Pi 4 (planned)
+# Board — Raspberry Pi 4
 
-> Third board, and the first outside the Allwinner family. Build name: `rpi4` (to be added to
-> `scripts/boards.sh`; work directory `~/rpi4`). History will go in `docs/log/rpi4.md`.
-> Status: steps 1–3 done 2026-10-18: skeleton, first build (57 min), first boot (launcher,
-> GLES, HDMI audio, USB DS3, ROM card). Next: the read-only root. Log: `docs/log/rpi4.md`.
+> Third board, and the first outside the Allwinner family. Build name: `rpi4` (work directory
+> `~/rpi4`). History: `docs/log/rpi4.md`.
+> Status: working. Skeleton, first build and first boot 2026-10-18; game tests pass
+> (2026-10-22); arcade case with power button and status LCD (2026-10-22/23). Open: the
+> read-only root, onboard Bluetooth, the release sweep.
 
 The fundamentals stay the same as on the other boards: **the menu on HDMI within a few seconds of
 power-on**, and **nothing a power cut can break**. Everything below is judged against those two.
