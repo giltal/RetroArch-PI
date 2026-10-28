@@ -1,10 +1,15 @@
 #!/bin/bash
 #
-# Update the Raspberry Pi 4's EEPROM bootloader over SSH, the way rpi-eeprom-update
-# does it. Run inside WSL:
+# Update a BCM2711 board's EEPROM bootloader over SSH, the way rpi-eeprom-update
+# does it: the Raspberry Pi 4, or the CM4 in the GPi Case 2 (same images,
+# firmware-2711). Run inside WSL:
 #
-#   wsl bash /mnt/c/RetroArch_PI/scripts/rpi4-eeprom.sh            # fetch + prepare, show the config
-#   wsl bash /mnt/c/RetroArch_PI/scripts/rpi4-eeprom.sh install    # ...then write it to the Pi
+#   wsl bash /mnt/c/RetroArch_PI/scripts/rpi4-eeprom.sh [board]            # fetch + prepare, show the config
+#   wsl bash /mnt/c/RetroArch_PI/scripts/rpi4-eeprom.sh [board] install    # ...then write it to the board
+#
+# [board] is rpi4 (the default) or gpicase2; the config is
+# board/<board>/eeprom-bootconf.txt. A CM4 Lite boots from its SD card, so the
+# boot ROM runs recovery.bin from p1 exactly as on the Pi 4.
 #
 # This changes the BOARD, not the card: ask the user first, every time.
 #
@@ -35,12 +40,19 @@ firmware-2711/default/recovery.bin 101246 e03c104dc350
 rpi-eeprom-config 26657 02f01b211dbf
 "
 PROJ=$(cd "$(dirname "$0")/.." && pwd)
-CONF=$PROJ/buildroot-external/board/rpi4/eeprom-bootconf.txt
-. "$PROJ/scripts/boards.sh" rpi4
+B=rpi4
+if [ -n "${1:-}" ] && [ "$1" != install ]; then B=$1; shift; fi
+CONF=$PROJ/buildroot-external/board/$B/eeprom-bootconf.txt
+[ -f "$CONF" ] || { echo "rpi4-eeprom: no $CONF" >&2; exit 1; }
+. "$PROJ/scripts/boards.sh" "$B"
+[ "$BOARD_BOOT" = rpi ] || { echo "rpi4-eeprom: $B does not boot through the Pi firmware" >&2; exit 1; }
 S=$BOARD_WORK/eeprom/$COMMIT
 U=$BOARD_WORK/eeprom/upd
 
 mkdir -p "$S"
+# The release files are the same for every board: reuse the Pi 4's verified
+# copies instead of downloading them again (still checked below).
+[ "$B" = rpi4 ] || cp -n ~/rpi4/eeprom/$COMMIT/* "$S/" 2>/dev/null || true
 echo "$FILES" | while read -r p size blob; do
 	[ -n "$p" ] || continue
 	f=$S/$(basename "$p")

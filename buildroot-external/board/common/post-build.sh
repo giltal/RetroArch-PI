@@ -44,6 +44,20 @@ sed -i '/^tty1::/d; /^# RetroOPI: HDMI console/d' "$TARGET_DIR/etc/inittab"
 printf '# RetroOPI: HDMI console (added by post-build.sh)\ntty1::respawn:/sbin/getty 38400 tty1\n' \
 	>> "$TARGET_DIR/etc/inittab"
 
+# --- Root filesystem: noatime, commit=60 ----------------------------------
+# No RTC: every boot starts in 1970 while the files carry their build dates, so
+# relatime rewrote the access time of every file read at every boot. On the GPi
+# Case 2's card that was 61 small journal writes at ~400 ms each, with every
+# boot read queued behind them (2026-10-28). commit=60 (ext4's default is 5 s)
+# then batches the boot's remaining journal commits into fewer writes; saves and
+# launcher state are on the ROM partition, and a clean shutdown syncs anyway.
+# The options have to be on inittab's remount itself: BusyBox's
+# "mount -o remount,rw /" does not take them from fstab (tried; the root stayed
+# relatime). Every board's rootfs is ext4 (BR2_TARGET_ROOTFS_EXT2_4).
+sed -i 's|^\(::sysinit:/bin/mount -o remount,rw\) /$|\1,noatime,commit=60 /|' "$TARGET_DIR/etc/inittab"
+grep -q '^::sysinit:/bin/mount -o remount,rw,noatime,commit=60 /$' "$TARGET_DIR/etc/inittab" \
+	|| fail "inittab: no 'mount -o remount,rw,noatime,commit=60 /' line (the root would stay relatime)"
+
 # --- Dev convenience: this build host's SSH key ---------------------------
 # Every reflash wiped /root/.ssh/authorized_keys, so board.sh stopped working
 # until the key was installed again by hand with the root password. If the

@@ -858,6 +858,7 @@ typedef struct {
     int fd;
     uint32_t crtc_id;
     uint32_t connector_id;
+    int monitor_index;      /* the same connector for RetroArch (video_monitor_index) */
     drmModeModeInfo mode;
 
     /* Double-buffered dumb framebuffers */
@@ -1067,19 +1068,52 @@ static int drm_init(void)
      * then the connector reads "disconnected" with no modes. Poll for a while
      * instead of failing at once. Each drmModeGetConnector() re-probes, which
      * also re-reads the EDID.
+     *
+     * HDMI wins over a built-in panel: the GPi Case 2's LCD (DPI-1) is always
+     * "connected", and the dock's HDMI is the screen whenever it is there. With
+     * a panel to fall back on, HDMI gets 2 s instead of 10. RETROOPI_CONNECTOR
+     * (a connector name, e.g. "DPI-1") forces one, for testing.
      */
+    const char *want = getenv("RETROOPI_CONNECTOR");
     drmModeConnector *conn = NULL;
+    int conn_index = 0;     /* 1-based among connected ones: RetroArch's video_monitor_index */
     for (int tries = 0; tries < 20 && !conn; tries++) {
-        for (int i = 0; i < res->count_connectors; i++) {
-            conn = drmModeGetConnector(g_drm.fd, res->connectors[i]);
-            if (conn && conn->connection == DRM_MODE_CONNECTED && conn->count_modes > 0)
-                break;
-            if (conn) drmModeFreeConnector(conn);
-            conn = NULL;
+        drmModeConnector *panel = NULL;
+        int panel_index = 0, n_connected = 0;
+        for (int i = 0; i < res->count_connectors && !conn; i++) {
+            drmModeConnector *c = drmModeGetConnector(g_drm.fd, res->connectors[i]);
+            if (!c) continue;
+            if (c->connection != DRM_MODE_CONNECTED || c->count_modes == 0) {
+                drmModeFreeConnector(c);
+                continue;
+            }
+            n_connected++;
+            char name[32];
+            snprintf(name, sizeof(name), "%s-%u",
+                     drmModeGetConnectorTypeName(c->connector_type) ?: "?",
+                     c->connector_type_id);
+            bool hdmi = c->connector_type == DRM_MODE_CONNECTOR_HDMIA ||
+                        c->connector_type == DRM_MODE_CONNECTOR_HDMIB;
+            if (want ? !strcmp(name, want) : hdmi) {
+                conn = c;
+                conn_index = n_connected;
+            } else if (!want && !panel) {
+                panel = c;
+                panel_index = n_connected;
+            } else {
+                drmModeFreeConnector(c);
+            }
         }
+        if (!conn && panel && !want && tries >= 3) {
+            conn = panel;
+            conn_index = panel_index;
+            panel = NULL;
+        }
+        if (panel) drmModeFreeConnector(panel);
         if (!conn) {
             if (tries == 0)
-                fprintf(stderr, "DRM: no display connected yet, waiting...\n");
+                fprintf(stderr, "DRM: no %s connected yet, waiting...\n",
+                        want ? want : "HDMI display");
             usleep(500 * 1000);
         }
     }
@@ -1088,6 +1122,10 @@ static int drm_init(void)
         drmModeFreeResources(res);
         return -1;
     }
+    g_drm.monitor_index = conn_index;
+    printf("DRM: connector %s-%u (monitor index %d)\n",
+           drmModeGetConnectorTypeName(conn->connector_type) ?: "?",
+           conn->connector_type_id, conn_index);
     g_drm.connector_id = conn->connector_id;
     if (drm_pick_mode(conn, &g_drm.mode) < 0) {
         drmModeFreeConnector(conn);
@@ -1580,7 +1618,8 @@ typedef struct {
 typedef struct {
     PadDev dev[MAX_PADS];   /* every gamepad, read together */
     int count;
-    double next_scan;   /* startup_now_ms() of the next hot-plug scan */
+    double next_scan;   /* startup_now_ms() of the next hot-plug check */
+    uint32_t seen;      /* event<N> already looked at (bit N), see input_scan */
     uint32_t held;      /* Currently held buttons */
     uint32_t pressed;   /* Just pressed this frame */
     uint32_t released;  /* Just released this frame */
@@ -1705,6 +1744,13 @@ static bool input_is_open(int evnum)
  * plugged in later works too: the GPi Case 2's built-in pad was found first
  * and a DS3 plugged into the dock was ignored (2026-10-28). A fallback device
  * is only taken when there is no gamepad at all.
+ *
+ * Each event node is opened once: g_input.seen remembers the numbers already
+ * looked at, and a node that is gone is forgotten. Closing a device that is
+ * not a pad waits for an RCU grace period (~220 ms on the GPi Case 2), and the
+ * first version, which reopened them all every 2 s, froze the menu for a
+ * fifth of a second every 2 s. Checking the directory's mtime instead missed
+ * the DS3's second node, created in the same tick as its first.
  */
 static void input_scan(void)
 {
@@ -1718,9 +1764,14 @@ static void input_scan(void)
             have_pad = true;
 
     for (int i = 0; i < 32 && g_input.count < MAX_PADS; i++) {
-        if (input_is_open(i))
-            continue;
         snprintf(path, sizeof(path), "/dev/input/event%d", i);
+        if (access(path, F_OK) != 0) {
+            g_input.seen &= ~(1u << i);     /* gone: look again if it returns */
+            continue;
+        }
+        if ((g_input.seen & (1u << i)) || input_is_open(i))
+            continue;
+        g_input.seen |= 1u << i;
         int fd = open(path, O_RDONLY | O_NONBLOCK);
         if (fd < 0) continue;
 
@@ -1767,7 +1818,7 @@ static void input_poll(void)
     struct input_event ev;
     ssize_t n;
 
-    /* Hot-plug: look for new pads every 2 s (a few open() calls). */
+    /* Hot-plug: every 2 s; only nodes not seen before are opened (input_scan). */
     if (startup_now_ms() >= g_input.next_scan) {
         input_scan();
         g_input.next_scan = startup_now_ms() + 2000;
@@ -1814,6 +1865,7 @@ static void input_poll(void)
         /* Detect device disconnection (stale fd) */
         if (n < 0 && errno != EAGAIN && errno != EWOULDBLOCK) {
             fprintf(stderr, "INPUT: event%d lost (errno=%d)\n", d->evnum, errno);
+            g_input.seen &= ~(1u << d->evnum);  /* a pad back under the same number */
             close(d->fd);
             g_input.dev[i] = g_input.dev[--g_input.count];
             g_input.held = 0;
@@ -4152,6 +4204,7 @@ static void launch_game(const char *rom_path, int system_idx, int state_slot)
         if (fc) {
             fprintf(fc, "video_fullscreen_x = \"%d\"\n", SCREEN_WIDTH);
             fprintf(fc, "video_fullscreen_y = \"%d\"\n", SCREEN_HEIGHT);
+            fprintf(fc, "video_monitor_index = \"%d\"\n", g_drm.monitor_index);
             if (state_slot >= 0) {
                 fprintf(fc, "savestate_auto_load = \"true\"\n");
                 /* A quick start loads slot 10 but saves (PS + R) go to slot

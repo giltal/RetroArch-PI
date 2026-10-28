@@ -14,11 +14,16 @@
 #
 # `stop` stays synchronous: at shutdown we genuinely want a fresh seed on disk
 # before the filesystem goes away, and shutdown latency does not matter.
+#
+# The 20 s wait: on the GPi Case 2's slow card (a small write ~0.4-0.9 s) rcS is
+# done while the launcher is still reading the card, so writing here at once
+# put the fsync in front of the launcher's reads (2026-10-28). Without a seed
+# refresh in this boot (switched off within 20 s), stop writes one at shutdown.
 case "$1" in
 	start)
 		# Detached, and giving up stdio -- same reason as net-hotplug: anything
 		# holding the parent's descriptors keeps the caller waiting.
-		setsid /bin/sh -c 'seedrng' </dev/null >/dev/null 2>&1 &
+		setsid /bin/sh -c 'sleep 20; seedrng' </dev/null >/dev/null 2>&1 &
 		;;
 	stop)
 		seedrng >/dev/null 2>&1 || true

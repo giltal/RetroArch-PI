@@ -1,0 +1,35 @@
+#!/bin/sh
+#
+# GPi Case 2 power latch: GPIO27 high keeps the case powered once its power
+# switch is slid off, so volumed can shut down cleanly (the switch is GPIO26,
+# a KEY_POWER through gpio-shutdown). Set here, once the system is up, as
+# Retroflag's and Recalbox's scripts do -- not by the firmware at power-on: with
+# the latch held from the start, a case that hung while booting could not be
+# switched off at all and stayed on, hot, until its battery ran down
+# (2026-10-28).
+#
+# Nothing drops it: poweroff on a Pi is a watchdog reset of the SoC with a halt
+# flag, which returns every pin to its default (GPIO27: input, pull-down), and
+# the case cuts the power. Docked, the dock powers the board and the switch is
+# only a signal.
+
+case "$1" in
+	start)
+		base=
+		for c in /sys/class/gpio/gpiochip*; do
+			[ "$(cat "$c/label" 2>/dev/null)" = pinctrl-bcm2711 ] && base=$(cat "$c/base")
+		done
+		if [ -z "$base" ]; then
+			echo "Power latch: no pinctrl-bcm2711 gpiochip"
+			exit 1
+		fi
+		g=$((base + 27))
+		if { [ -d /sys/class/gpio/gpio$g ] || echo $g > /sys/class/gpio/export; } &&
+		   echo high > /sys/class/gpio/gpio$g/direction; then
+			echo "Power latch: GPIO27 high"
+		else
+			echo "Power latch: FAILED, the switch cuts power at once"
+			exit 1
+		fi
+		;;
+esac

@@ -1,7 +1,9 @@
 # Board — Retroflag GPi Case 2 + Compute Module 4
 
-> **Status 2026-10-28: stage 1 (docked) boots; menu and games run (720p display).** Board layer `board/gpicase2`,
-> first-boot checklist in `docs/log/gpicase2.md`.
+> **Status 2026-10-28: docked (HDMI) and handheld (LCD) both run the menu and games.** The case
+> switches the LCD off while docked; sound follows (HDMI or the case's speaker). Open: dock changes
+> need a restart. Log in
+> `docs/log/gpicase2.md`.
 
 > Fourth target, and the first handheld. A Compute Module 4 (BCM2711, the Pi 4's SoC) in
 > Retroflag's GPi Case 2: a 3.0" 640×480 LCD, built-in controls, speaker and headphone jack,

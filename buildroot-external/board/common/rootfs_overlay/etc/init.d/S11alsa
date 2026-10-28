@@ -16,6 +16,11 @@
 # order is probe order, which is not a contract, so match on the NAME in
 # /proc/asound/cards. HDMI is preferred because the console lives on a TV.
 #
+# Unless no HDMI display is connected and there is a USB sound card: the GPi
+# Case 2 out of its dock plays through its own USB sound card (speaker and
+# headphone jack), while the vc4 HDMI cards still exist. Picking HDMI there left
+# the handheld silent (2026-10-28). Without a USB card nothing changes.
+#
 # Force a card by putting its number in /opt/roms/_system/audio_card (a single
 # digit). That file is on the FAT partition, so it can be edited from a PC if the
 # automatic choice is wrong.
@@ -40,6 +45,11 @@ pick_card() {
 		[ -n "$c" ] && [ -d "/proc/asound/card$c" ] && { echo "$c"; return; }
 	fi
 	# Lines look like: " 0 [ahubhdmi       ]: ahub_plat - ahubhdmi"
+	#                  " 2 [Device         ]: USB-Audio - USB Audio Device"
+	if ! grep -qx connected /sys/class/drm/card*-HDMI-*/status 2>/dev/null; then
+		c=$(grep 'USB-Audio' /proc/asound/cards 2>/dev/null | sed -n 's/^ *\([0-9]\+\) .*/\1/p' | head -1)
+		[ -n "$c" ] && { echo "$c"; return; }
+	fi
 	c=$(grep -i 'hdmi' /proc/asound/cards 2>/dev/null | sed -n 's/^ *\([0-9]\+\) .*/\1/p' | head -1)
 	[ -n "$c" ] && { echo "$c"; return; }
 	c=$(sed -n 's/^ *\([0-9]\+\) .*/\1/p' /proc/asound/cards 2>/dev/null | head -1)

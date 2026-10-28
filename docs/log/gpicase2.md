@@ -85,3 +85,150 @@ defconfig has no getty now; log in over SSH.
 
 Still open from the checklist: HDMI audio, the power switch and latch, the game tests, and
 `udevadm settle failed` at boot.
+
+## 2026-10-28 — Stage 2: the LCD, the power latch, the built-in pad
+
+**A hang that could not be switched off.** The first LCD attempt (`vc4-kms-dpi-generic` with
+the panel's timings, plus `gpio=0-17,19-25=a2`) hung the boot: both screens black, no network,
+the SoC hot. The power switch did nothing. Two findings:
+- **Docked, the dock powers the board and the switch is only a signal**; pulling the dock's
+  power does not help either, the battery takes over (uptime kept counting). Undocked, the
+  switch plus the latch decide.
+- **The latch was held from power-on** (`gpio=27=op,dh`, and `gpio-poweroff` drives it high
+  at probe), so undocked a hung boot stayed on too, until the battery ran down. Recalbox sets
+  it from its shutdown script once the system is up. Now: no firmware line, no
+  `gpio-poweroff`; `init.d/S03latch` (board/gpicase2 overlay) sets GPIO27 high via sysfs.
+  Power-off still cuts the case: a Pi powers off through a watchdog reset that returns the pins
+  to their defaults (GPIO27: input, pull-down). Tested undocked: the switch after 30 s shuts
+  down cleanly and the LED goes out; the switch 2 s after power-on cuts it at once.
+
+**The LCD hang: panel-simple was a module.** Found in steps, each one undocked-switchable:
+- Without the `gpio=` line it still hung: the overlay itself.
+- A diagnostic boot (firmware HDMI and splash on, `loglevel=7`) showed the rainbow, then black:
+  no kernel text.
+- Loaded at runtime over SSH (configfs), the same overlay applied, panel-simple bound and
+  DPI-1 appeared at 640x480. (Rebinding vc4 at runtime gives `flip_done timed out` even
+  without the LCD, so the live test could not show a picture.)
+- A boot that wrote its log to the FAT partition every second left no file: the kernel never
+  reached init.
+- vc4 is built in and waited for the DPI's panel, whose driver (panel-simple) was a module that
+  needs the root filesystem. The same trap as i2c-brcmstb before. `CONFIG_DRM_PANEL_SIMPLE=y`
+  (and `CONFIG_BACKLIGHT_CLASS_DEVICE=y`, without which Kconfig silently kept it =m) in the
+  bcm2711 fragment: clean boot, DPI bound at 0.26 s.
+
+**Docked, the LCD stays off.** Colour bars from `modetest` on DPI-1 at 640x480, with every pin
+in alt2 and the pixel clock at 24 MHz: no backlight. Undocked, the LCD lit at once. The case
+switches the LCD off while docked, so the screens are never lit together: docked = HDMI,
+undocked = LCD. (So an info-only LCD beside HDMI, as on the Pi 4, is not possible here.)
+
+**The launcher chooses the screen at boot.** It prefers a connected HDMI connector (2 s, since
+the LCD is always "connected"), else the panel; `RETROOPI_CONNECTOR` forces one. It passes
+`video_monitor_index` with the size to RetroArch. Undocked: the menu on the LCD at 640x480,
+and a Game Boy game started.
+
+**The built-in pad in games.** RetroArch had no profile for `Microsoft X-Box 360 pad`
+(045e:028e), so the game ignored it. New autoconfig profile (buttons from the pad's key list,
+d-pad on hat 0). The hotkeys moved from `retroarch.cfg` into each pad's profile, because
+RetroArch only uses a profile's hotkeys when retroarch.cfg leaves them unset, and the modifier
+is button 10 on the DS3 (PS) but 8 on this pad (home). Tested docked: both pads play, and
+Hotkey/PS + Start quits on each.
+
+**Bootloader card errors.** `SD: card not detected` (or garbage partition table) came back on
+some boots, cold ones too; a reseat fixed it. Linux runs the card at 3.3 V high speed, so it is
+not a 1.8 V card mode left over. Suspects: the no-name 125 GiB "APPSD" card, or the CM4's old
+bootloader (2023-01-11).
+
+**Sound undocked.** S11alsa picked the first card named "hdmi", and the vc4 HDMI cards exist
+undocked too, so the handheld was silent. It now takes a `USB-Audio` card when no HDMI
+connector is connected (the case's speaker card: `GeneralPlus USB Audio Device`, card 2);
+boards without one are unchanged. Tested undocked: sound from the speaker, and Hotkey +
+Up/Down changes the volume.
+
+Still open: docking or undocking while running needs a restart (the screen and the sound card
+are chosen at boot; a TV slow to raise hot-plug could also send the sound to the speaker); the
+bootloader card errors.
+
+## 2026-10-28 — Boot time: where the 20+ s go
+
+Measured docked (process start times from `/proc/<pid>/stat`, the launcher's STARTUP marks,
+and a test-only init script sampling the launcher's `/proc/<pid>/stack` every 50 ms):
+
+| Stage | GPi Case 2 | Pi 4 |
+|---|---|---|
+| Power-on to kernel (bootloader + firmware) | ~10 s or more | ~7 s |
+| Kernel to init | 0.5 s | 0.6 s |
+| init to launcher start | 2-3 s (udev ~2 s) | 1.4 s |
+| Launcher start to menu | 4.5-7.9 s | 0.7 s |
+
+**The launcher's slow step was card I/O.** `favorites+recents` (two files under 1 KB) took
+2.3-6.6 s: blocked in `filemap_get_pages` / `mmc_blk_rw_wait`, behind every other boot
+service reading its binaries from the card at the same time. The card is slow: a no-name
+"APPSD" (manfid 0), 17 MB/s sequential, in 3.3 V high-speed mode (no UHS on this carrier).
+
+**A bug of mine found on the way: the pad hot-plug scan froze the menu.** Every 2 s the
+launcher opened and closed every input device; each close of a non-pad device waits for an
+RCU grace period, ~220 ms blocked per scan. It now checks the mtime of `/dev/input` every 2 s
+and rescans only when it changed. After the fix the idle launcher stays in S (sleeping), and a
+restart reaches the menu in 0.76 s.
+The mtime check then missed a hot-plugged DS3 (its two nodes appear in the same tick, the
+second one unseen until a replug). Now the launcher remembers which event numbers it has
+looked at (a bitmask), opens only new ones every 2 s, and forgets a number when its node goes
+or its fd fails. Tested: a DS3 plugged in with the menu up works, and again after a replug.
+
+**A DS3 plugged in at a cold boot never appears on USB** (no Sony device in `lsusb`, no connect
+on the dock's hub port), though its LEDs flash. The dock's ports have power from switch-on, but
+the host starts ~10 s later; the DS3 seems to give up on USB until it is replugged. A software
+port power-cycle (`1-1.1-port4/disable`) did nothing: the dock's hub (Terminus 1a40:0101) has
+ganged port power. Workarounds: plug the DS3 in once the menu is up, or Bluetooth with a dongle.
+
+Next: the bootloader (2023-01-11) and its ~10 s; a known-good card would also tell how much
+of the Linux time is this card.
+
+## 2026-10-28 — CM4 bootloader update
+
+**EEPROM bootloader: `63bef4a4` (2023-01) → `6ab3bfc6`** (`pieeprom-2026-09-23.bin`, the Pi 4's
+release, rpi-eeprom `7ed1cc2`). The user approved the write. `scripts/rpi4-eeprom.sh` takes the
+board name now (`rpi4-eeprom.sh gpicase2 [install]`) and reuses the Pi 4's verified release
+files. Config `board/gpicase2/eeprom-bootconf.txt`: the Pi 4's (`NET_INSTALL_AT_POWER_ON=0`)
+plus **`BOOT_ORDER=0xf1`**: SD, else restart and retry SD. It was `0xf25641`, which spent ~30 s
+on USB, NVMe and network whenever the card was not detected. The update timestamp matched the
+`.sig` (`1793190878`); both warm reboots of the update came back.
+
+DS3 at a cold boot: still not on USB after the update, with or without the PS button; only a
+replug wakes it. So it is the dock's ganged port power, not the bootloader's timing.
+To check: power-on to menu by stopwatch, and whether the `SD: card not detected` boots still
+happen.
+
+**Warm reboots do not come back.** A `reboot` from Linux ends in the bootloader's
+`SD: card not detected` and needs a power cycle (the bootloader's own reboots during the update
+did come back). Linux runs the card at 3.3 V high speed, so it is not a leftover 1.8 V mode.
+The launcher's Restart item would leave the case stuck: to fix, or make it safe on this board.
+
+**Boot writes: relatime without a clock.** After a cold boot the rootfs had done 61 writes
+(1.1 MiB, all journal: `jbd2` wrote 372 KiB) that took 24 s of card time, ~400 ms each, and the
+launcher's reads queued behind them. With no RTC every boot starts in 1970, the files carry their
+build dates, and relatime then updates the access time of every file read at every boot. Fix,
+all boards: board/common/post-build.sh makes inittab's remount `remount,rw,noatime` (BusyBox's
+remount does not take options from fstab: tried, the root stayed relatime) and fails without it.
+Power-on to menu after the bootloader update and before this fix: 18 s (stopwatch).
+After the fix (applied to the case's inittab, cold boot): root `noatime`; rootfs writes 61 → 9
+(24 s → 3.5 s of card time); launcher start to menu 8.0 → 4.3 s; Linux to menu ~10 → ~6.4 s;
+**stopwatch 18 → 15 s**. Left: ~8.5 s before Linux, and the launcher's 3.1 s on the ROM
+partition (exFAT, 128 KiB clusters: 122 reads at boot, 39 ms each).
+
+**What still slows the launcher: writes, not the ROM partition.** A test-only sampler logged
+every ROM-partition read at boot with the running init script. The exFAT mount (29 reads), the
+launcher's files and S46card's folder check (~60 reads, 3.5 MB) are all done by 3.1 s. From
+4.3 to 10.2 s the launcher sat in `mmc_blk_rw_wait` with no new ROM reads: behind writes. That
+boot the rootfs did 20 writes in 18.5 s of card time (~0.9 s each; 9 the boot before): the
+random seed, ext4's mount record, journal commits, the ALSA config. All normal, and fast on a
+decent card. Options: a known-brand A1/A2 card first; then ext4 `commit=60` and a later seed
+write; or the read-only rootfs.
+
+**Batching the writes (all boards).** S51seedrefresh's detached `seedrng` now waits 20 s (on the
+GPi rcS ends while the launcher is still reading the card; `stop` still saves a seed at
+shutdown), and the root remount adds `commit=60` (post-build makes it
+`remount,rw,noatime,commit=60` and checks it). Cold boot: launcher ready in **1,045 ms**
+(`favorites+recents` 1 ms, was 3-7 s), started at 1.92 s, so **Linux to menu ~3 s**.
+**Stopwatch 15 → 11.5 s.** Boot-time pass on the GPi: 20+ s → 11.5 s. What is left is mostly
+before Linux (~8.5 s: bootloader, firmware, the kernel read from this slow card).

@@ -4,9 +4,9 @@
 # board/rpi4/config.txt for why most of these lines are what they are.
 # board/bcm2711/post-build.sh checks the lines it depends on.
 #
-# Stage 1 (docs/boards/gpicase2.md): docked only. Video and sound on the dock's
-# HDMI, pads and a USB Ethernet adapter on the dock's USB ports. The case's LCD
-# (DPI on GPIO0-25 except 18) is not driven yet.
+# Docked: video and sound on the dock's HDMI, pads and a USB Ethernet adapter
+# on the dock's USB ports. Handheld: the case's LCD (DPI), built-in pad and USB
+# sound card (docs/boards/gpicase2.md).
 
 # --- What to boot ---------------------------------------------------------
 arm_64bit=1
@@ -25,6 +25,24 @@ disable_overscan=1
 # The firmware leaves HDMI alone and vc4 alone turns it on (one TV lock per
 # boot instead of two; board/rpi4/config.txt).
 hdmi_ignore_hotplug=1
+
+# --- The case's LCD -------------------------------------------------------
+# AUO A030VVN01, 3.0" 640x480, on the DPI pins: 18-bit in the "cpadhi" pin
+# layout (dpi_18bit_cpadhi_gpio0), RGB order. Timings from the stock Recalbox
+# card (hdmi_timings=640 0 41 40 41 480 0 18 9 18 ... 60 0 24000000;
+# dpi_output_format=0x16 = 18-bit config 2, RGB): 24 MHz, 60 Hz. vc4 gets a
+# second connector, DPI-1, next to HDMI-A-1; the launcher picks HDMI when the
+# dock's display is connected, else the LCD (docs/boards/gpicase2.md). The case
+# itself switches the LCD off (no backlight) while docked, so the two screens
+# are never lit together.
+# The panel needs panel-simple built into the kernel (board/bcm2711 fragment):
+# as a module the boot hung before init.
+# GPIO0-25 except 18 (the dock's hot-plug line) to alt2, as Recalbox does.
+gpio=0-17,19-25=a2
+dtoverlay=vc4-kms-dpi-generic,rgb666-padhi,clock-frequency=24000000
+dtparam=hactive=640,hfp=41,hsync=40,hbp=41
+dtparam=vactive=480,vfp=18,vsync=9,vbp=18
+dtparam=width-mm=61,height-mm=46
 
 # --- Fast boot ------------------------------------------------------------
 boot_delay=0
@@ -47,11 +65,11 @@ dtoverlay=dwc2,dr_mode=host
 # Switch on GPIO26 (pull-up; sliding it off pulls it low): gpio-shutdown makes
 # it a KEY_POWER that volumed turns into a clean poweroff.
 dtoverlay=gpio-shutdown,gpio_pin=26
-# Latch on GPIO27: the case stays powered while it is high. The firmware drives
-# it high from the start; gpio-poweroff drives it low at the very end of a
-# poweroff, after the filesystems are unmounted, and the case cuts the power.
-gpio=27=op,dh
-dtoverlay=gpio-poweroff,gpiopin=27,active_low=1
+# Latch on GPIO27: with the switch off, the case stays powered while it is
+# high. Not set here: init.d/S03latch sets it once the system is up, so a case
+# that hangs while booting can still be switched off (undocked). The first
+# image had gpio=27=op,dh + gpio-poweroff, and a hung boot stayed on until the
+# battery ran down (2026-10-28).
 
 # --- CPU ------------------------------------------------------------------
 arm_boost=1

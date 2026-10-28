@@ -11,7 +11,7 @@ on mainline Linux 6.18.53. **One tree, several boards:**
 | Orange Pi Zero3 (`zero3`) | Allwinner H618, Mali-G31 MP2, 2 GB LPDDR4 | The reference board: almost every setting was measured on it |
 | KickPi K2B V2.2 (`k2b`) | Allwinner H618, Mali-G31 MP2, 2 GB DDR3 | Maxio MAE0621A PHY; V1 not supported; no eMMC |
 | Raspberry Pi 4 (`rpi4`) | BCM2711, V3D 4.2 | Working: family layer `board/bcm2711`, board `board/rpi4`; notes in `docs/boards/rpi4.md` |
-| GPi Case 2 + CM4 Lite (`gpicase2`) | BCM2711, V3D 4.2 | Stage 1 (docked: HDMI + USB) boots, menu and games run; board `board/gpicase2`; plan in `docs/boards/gpicase2.md` |
+| GPi Case 2 + CM4 Lite (`gpicase2`) | BCM2711, V3D 4.2 | Docked (HDMI) and handheld (LCD + speaker) both run; dock changes need a restart; board `board/gpicase2`; plan in `docs/boards/gpicase2.md` |
 
 History: a port of RetroBPI_M2M (Banana Pi M2 Magic). The Zero3 tree (RetroOPI_Z3) became this
 repo; the K2B was first ported in its own tree and merged here. Both old folders are
@@ -143,10 +143,10 @@ C:\RetroArch_PI
     board/opi-zero3/  linux.config, patches/linux (0046/0047/0050/0051), extlinux.conf
     board/kickpi-k2b/ linux.config, patches/linux (0060-0066), patches/uboot (0001-0002), extlinux.conf
     board/rpi4/       config.txt, cmdline.txt, genimage.cfg, rootfs_overlay (LCD: lcdinfo, init file)
-    board/gpicase2/   config.txt, cmdline.txt, genimage.cfg (GPi Case 2 + CM4 Lite)
+    board/gpicase2/   config.txt, cmdline.txt, genimage.cfg, rootfs_overlay (S03latch) (GPi Case 2 + CM4 Lite)
   launcher/  tools/
   hardware/rpi4-arcade-case/  arcade_case.py (Fusion API script: the source), step/, 3mf/, stl/, README.md
   scripts/   boards.sh, build.sh, board.sh, serial.ps1, fetch-thumbnails.py, gen-*.py,
-             rpi4-eeprom.sh (Pi 4 bootloader update; changes the board: ask first)
+             rpi4-eeprom.sh [board] (Pi 4 / CM4 bootloader update; changes the board: ask first)
   firmware/<board>/   build output (gitignored)
 ```
