@@ -46,7 +46,7 @@ pick_card() {
 	fi
 	# Lines look like: " 0 [ahubhdmi       ]: ahub_plat - ahubhdmi"
 	#                  " 2 [Device         ]: USB-Audio - USB Audio Device"
-	if ! grep -qx connected /sys/class/drm/card*-HDMI-*/status 2>/dev/null; then
+	if ! hdmi_connected; then
 		c=$(grep 'USB-Audio' /proc/asound/cards 2>/dev/null | sed -n 's/^ *\([0-9]\+\) .*/\1/p' | head -1)
 		[ -n "$c" ] && { echo "$c"; return; }
 	fi
@@ -111,8 +111,29 @@ vol_get() {
 		| sed -n 's/.*: values=\([0-9]*\).*/\1/p' | head -1
 }
 
+hdmi_connected() {
+	grep -qx connected /sys/class/drm/card*-HDMI-*/status 2>/dev/null
+}
+
 case "$1" in
 	start)
+		# No HDMI display and no USB sound card yet: the GPi Case 2 out of its
+		# dock, whose USB card registers ~2.4 s after the kernel starts while
+		# this script runs at ~1.2 s. Picking then chose HDMI and the handheld
+		# was silent (2026-10-28, after the boot got faster). So wait for it,
+		# up to 5 s, in the background: the launcher sets its volume only after
+		# its own 2 s wait for HDMI, and alsactl restore below sets the saved
+		# level anyway. Docked, or with no panel at all, nothing changes.
+		if [ -z "$S11ALSA_WAITED" ] && ! hdmi_connected && \
+		   ! grep -q 'USB-Audio' /proc/asound/cards 2>/dev/null; then
+			( i=0
+			  while [ $i -lt 50 ] && ! grep -q 'USB-Audio' /proc/asound/cards 2>/dev/null; do
+				sleep 0.1; i=$((i + 1))
+			  done
+			  S11ALSA_WAITED=1 "$0" start ) </dev/null >/dev/console 2>&1 &
+			echo "Audio: waiting for a USB sound card (no HDMI display)"
+			exit 0
+		fi
 		printf "Audio: "
 		if ! grep -q '^ *[0-9]' /proc/asound/cards 2>/dev/null; then
 			echo "FAIL (no sound cards)"

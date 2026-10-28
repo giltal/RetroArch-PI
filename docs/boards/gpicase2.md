@@ -63,7 +63,7 @@ stack as ours, which settles most open questions. Two stages:
 | RetroArch at 640×480 | `retroarch.cfg` fixes 1920×1080; the launcher adds a per-screen config. Fewer pixels: the heavy cores run faster on the LCD | small |
 | Audio | The case's USB sound card: S11alsa (and the softvol control the launcher and volumed share) must pick it when undocked, HDMI when docked. Mono downmix in ALSA (`route` plugin) | medium |
 | Built-in pad | `xpad` in the kernel (check), RetroArch's Xbox 360 autoconfig, and the launcher's button mapping (it knows the DS3's codes today). volumed's volume combo needs the pad's "hotkey" (BTN_MODE 316, same code as the DS3's PS) | small to medium |
-| Battery | No fuel gauge found; nothing to show | — |
+| Battery | No fuel gauge (no I2C, ADC or power_supply). The launcher shows dock/battery and a low warning from the under-voltage alarm (`/etc/retroopi-battery`) | done |
 
 ## Still open
 

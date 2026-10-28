@@ -1,0 +1,2 @@
+# Presence turns on the launcher's dock/battery icon (launcher.c, "Power source").
+# The GPi Case 2 has no fuel gauge: docked or not, and the under-voltage alarm.

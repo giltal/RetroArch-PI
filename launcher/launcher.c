@@ -2968,6 +2968,136 @@ static void menu_load_settings(void)
 }
 
 /* =========================================================================
+ * Power source (battery boards)
+ * ========================================================================= */
+
+/*
+ * The GPi Case 2 runs on a 4000 mAh battery but has no fuel gauge: no I2C,
+ * no ADC, no power_supply device. What reaches the CM4 is the dock (it drives
+ * HDMI, so HDMI connected = docked = on the dock's power) and the firmware's
+ * under-voltage alarm (hwmon "rpi_volt", in0_lcrit_alarm), which trips as the
+ * battery nears empty. So the header shows a plug when docked, a battery
+ * outline when not, and a red battery once the alarm holds undocked. No
+ * percentage: there is none to show.
+ *
+ * Opt-in per board: /etc/retroopi-battery (board/gpicase2's overlay). A Pi 4
+ * on a weak supply raises the same alarm, and there it means something else.
+ *
+ * LOW needs the alarm in two polls running (a load spike can trip it for one
+ * moment) and then stays until the case is docked: a sagging battery does not
+ * come back.
+ */
+enum { POWER_NONE, POWER_DOCKED, POWER_BATTERY, POWER_LOW };
+static int    g_power_state = POWER_NONE;
+static int    g_power_alarms;           /* consecutive polls with the alarm set */
+static double g_power_next;             /* startup_now_ms() of the next poll */
+static char   g_power_alarm_path[64];   /* "" when there is no rpi_volt */
+
+static bool sysfs_read_line(const char *path, char *buf, size_t n)
+{
+    FILE *f = fopen(path, "r");
+    if (!f) return false;
+    bool ok = fgets(buf, (int)n, f) != NULL;
+    fclose(f);
+    if (ok) buf[strcspn(buf, "\n")] = '\0';
+    return ok;
+}
+
+static bool power_docked(void)
+{
+    DIR *d = opendir("/sys/class/drm");
+    if (!d) return false;
+    bool docked = false;
+    struct dirent *de;
+    while (!docked && (de = readdir(d))) {
+        if (!strstr(de->d_name, "-HDMI-")) continue;
+        char path[300], s[32];
+        snprintf(path, sizeof(path), "/sys/class/drm/%s/status", de->d_name);
+        docked = sysfs_read_line(path, s, sizeof(s)) && strcmp(s, "connected") == 0;
+    }
+    closedir(d);
+    return docked;
+}
+
+static void power_init(void)
+{
+    if (access("/etc/retroopi-battery", F_OK) != 0) return;
+    for (int i = 0; i < 8; i++) {
+        char path[64], name[32];
+        snprintf(path, sizeof(path), "/sys/class/hwmon/hwmon%d/name", i);
+        if (sysfs_read_line(path, name, sizeof(name)) && strcmp(name, "rpi_volt") == 0) {
+            snprintf(g_power_alarm_path, sizeof(g_power_alarm_path),
+                     "/sys/class/hwmon/hwmon%d/in0_lcrit_alarm", i);
+            break;
+        }
+    }
+    g_power_state = power_docked() ? POWER_DOCKED : POWER_BATTERY;
+    g_power_next = startup_now_ms() + 2000;
+    printf("Power: %s, low-battery alarm %s\n",
+           g_power_state == POWER_DOCKED ? "docked" : "battery",
+           g_power_alarm_path[0] ? g_power_alarm_path : "not found");
+}
+
+/* Every 2 s; true when the icon changed. Two small sysfs reads, no card I/O. */
+static bool power_poll(void)
+{
+    if (g_power_state == POWER_NONE || startup_now_ms() < g_power_next)
+        return false;
+    g_power_next = startup_now_ms() + 2000;
+
+    char s[16];
+    bool alarm = g_power_alarm_path[0] &&
+                 sysfs_read_line(g_power_alarm_path, s, sizeof(s)) && atoi(s) != 0;
+    g_power_alarms = alarm ? g_power_alarms + 1 : 0;
+
+    int state;
+    if (power_docked())
+        state = POWER_DOCKED;
+    else if (g_power_state == POWER_LOW || g_power_alarms >= 2)
+        state = POWER_LOW;
+    else
+        state = POWER_BATTERY;
+
+    if (state == g_power_state) return false;
+    if (state == POWER_LOW) {
+        printf("Power: battery low\n");
+        msg_show("Battery low: dock the case");
+    }
+    g_power_state = state;
+    return true;
+}
+
+/* The icon, right edge at `right`, centred in the header. Returns its left. */
+static int ui_draw_power(int right)
+{
+    if (g_power_state == POWER_NONE) return right;
+    int h = UI_SCALE(14), w = UI_SCALE(26);
+    int t = UI_SCALE(2) > 0 ? UI_SCALE(2) : 1;
+    int x = right - w, y = (HEADER_HEIGHT - h) / 2, cy = y + h / 2;
+
+    if (g_power_state == POWER_DOCKED) {
+        /* A plug: cord, body, two prongs */
+        pixel_t c = COL_SYSTEM_ICON;
+        gfx_fill_rect(x, cy - t / 2, w * 35 / 100, t, c);
+        gfx_fill_rect(x + w * 35 / 100, y + h * 15 / 100, w * 35 / 100, h * 70 / 100, c);
+        gfx_fill_rect(x + w * 70 / 100, y + h * 25 / 100, w * 30 / 100, t, c);
+        gfx_fill_rect(x + w * 70 / 100, y + h * 75 / 100 - t, w * 30 / 100, t, c);
+    } else {
+        /* A battery outline; when low, red with a sliver of charge */
+        pixel_t c = g_power_state == POWER_LOW ? 0x00ef4444 : COL_TEXT_DIM;
+        int tip = UI_SCALE(3) > 0 ? UI_SCALE(3) : 1, bw = w - tip;
+        gfx_fill_rect(x, y, bw, t, c);
+        gfx_fill_rect(x, y + h - t, bw, t, c);
+        gfx_fill_rect(x, y, t, h, c);
+        gfx_fill_rect(x + bw - t, y, t, h, c);
+        gfx_fill_rect(x + bw, cy - h / 4, tip, h / 2, c);
+        if (g_power_state == POWER_LOW)
+            gfx_fill_rect(x + 2 * t, y + 2 * t, (bw - 4 * t) / 4, h - 4 * t, c);
+    }
+    return x;
+}
+
+/* =========================================================================
  * UI Rendering
  * ========================================================================= */
 
@@ -2999,6 +3129,7 @@ static void ui_draw_header(const char *title)
         TTF_SizeUTF8(g_font_small, tname, &tw, NULL);
         gfx_draw_text(g_font_small, tname, SCREEN_WIDTH - PADDING_X - tw, UI_SCALE(14),
                       COL_SYSTEM_ICON, 0);
+        ui_draw_power(SCREEN_WIDTH - PADDING_X - tw - UI_SCALE(12));
     } else {
         /* Back arrow + system name */
         gfx_draw_text(g_font_header, "\xe2\x97\x80", PADDING_X, UI_SCALE(8), COL_TEXT_DIM, 0);
@@ -3013,6 +3144,7 @@ static void ui_draw_header(const char *title)
         TTF_SizeUTF8(g_font_small, count_str, &tw, NULL);
         gfx_draw_text(g_font_small, count_str, SCREEN_WIDTH - PADDING_X - tw, UI_SCALE(14),
                       COL_TEXT_DIM, 0);
+        ui_draw_power(SCREEN_WIDTH - PADDING_X - tw - UI_SCALE(12));
     }
 }
 
@@ -3834,9 +3966,15 @@ static int search_run(void)
         "1234567890", "QWERTYUIOP", "ASDFGHJKL", "ZXCVBNM"
     };
 
-    /* Keyboard geometry (comments give the values at 480 lines) */
+    /* Keyboard geometry (comments give the values at 480 lines). The sizes
+     * scale with the height, tuned for 16:9: at 4:3 (the GPi Case 2's 640x480)
+     * ten 68 px keys are 716 px and the row ran off both sides, so the key
+     * width is also capped to fit ten keys between the margins (56 there). */
     const int
-        KW  = UI_SCALE(68),  KH  = UI_SCALE(38),  KG  = UI_SCALE(4),
+        KG  = UI_SCALE(4),
+        KW  = UI_SCALE(68) < (SCREEN_WIDTH - 2 * PADDING_X + KG) / 10 - KG
+              ? UI_SCALE(68) : (SCREEN_WIDTH - 2 * PADDING_X + KG) / 10 - KG,
+        KH  = UI_SCALE(38),
         KRP = KH + KG,                      /* 42 row pitch */
         KY0 = UI_SCALE(270),                /* first row Y */
         KLT = HEADER_HEIGHT + 4,            /* list top */
@@ -4365,6 +4503,8 @@ int main(int argc, char *argv[])
     /* Restore saved state (theme, position) */
     state_load();
 
+    power_init();
+
     /* Initial draw */
     ui_draw();
     startup_mark("state+draw");
@@ -4606,6 +4746,8 @@ int main(int argc, char *argv[])
         if (g_jump_hint_frames > 0 && --g_jump_hint_frames == 0)
             dirty = 1;
         if (g_msg_frames > 0 && --g_msg_frames == 0)
+            dirty = 1;
+        if (power_poll())
             dirty = 1;
 
         if (dirty) {

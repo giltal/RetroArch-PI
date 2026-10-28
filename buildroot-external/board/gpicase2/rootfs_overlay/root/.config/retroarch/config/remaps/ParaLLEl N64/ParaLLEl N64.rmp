@@ -1,0 +1,19 @@
+# GPi Case 2: the built-in pad has no stick, and N64 games steer with the
+# analog stick (Mario Kart 64 was unplayable, 2026-10-28). So on N64 the d-pad
+# drives the left stick, at full tilt.
+#
+# A remap sends a physical input (the key) to a core input (the value): d-pad
+# up/down/left/right are buttons 4/5/6/7, and the left stick's X+, X-, Y+, Y-
+# are 16/17/18/19 (RetroArch input_defines.h; Y+ is down). The d-pad no longer
+# reaches the core as a d-pad on N64, which few games use. A DS3 in the dock
+# keeps its own stick: only the d-pad is remapped.
+#
+# Both ports: docked, the case's pad can be player 2 behind a DS3.
+input_player1_btn_up = "19"
+input_player1_btn_down = "18"
+input_player1_btn_left = "17"
+input_player1_btn_right = "16"
+input_player2_btn_up = "19"
+input_player2_btn_down = "18"
+input_player2_btn_left = "17"
+input_player2_btn_right = "16"

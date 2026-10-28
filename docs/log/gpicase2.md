@@ -232,3 +232,49 @@ shutdown), and the root remount adds `commit=60` (post-build makes it
 (`favorites+recents` 1 ms, was 3-7 s), started at 1.92 s, so **Linux to menu ~3 s**.
 **Stopwatch 15 → 11.5 s.** Boot-time pass on the GPi: 20+ s → 11.5 s. What is left is mostly
 before Linux (~8.5 s: bootloader, firmware, the kernel read from this slow card).
+
+## 2026-10-28 — Battery indicator (dock / battery / low)
+
+**The case gives the CM4 no battery level.** Probed on the case: no `/sys/class/power_supply`,
+the only I2C buses are the two HDMI DDC ones (i2c-20/21), no IIO, and the USB devices are the
+hub, the pad (Nuvoton "GBA Pi Case+", 045e:028e) and the sound card. The case's own LED is
+the only charge display. What the CM4 can see: the dock (it drives HDMI, so HDMI connected =
+on the dock's power) and the firmware's under-voltage alarm, hwmon `rpi_volt`
+`in0_lcrit_alarm`, which trips as the battery nears empty.
+
+**The launcher shows that, not a percentage** (launcher.c, "Power source"): a plug when docked,
+a battery outline when not, a red battery with a `Battery low: dock the case` message once the
+alarm holds for two polls running (2 s apart; a load spike can trip it for a moment). LOW then
+stays until the case is docked. The icon sits in the header, left of the game count (theme
+name in Settings). Opt-in per board with `/etc/retroopi-battery` (gpicase2 overlay): a Pi 4
+on a weak supply raises the same alarm. Polled every 2 s: two sysfs reads, no card I/O. Not
+shown during a game (RetroArch has the screen); the launcher catches up within 2 s of the
+return.
+
+Tested on the case: plug on the TV docked, battery outline on the LCD undocked. **The low state
+is untested**: it needs a battery run down to the alarm.
+
+## 2026-10-28 — Handheld fixes: sound, N64 steering, keyboard; slot 10
+
+**No sound undocked again, after the boot got faster.** The case's USB sound card registers at
+2.4 s (kernel time), and S11alsa now runs at ~1.2 s: with no USB card yet it picked HDMI. Fix
+(board/common S11alsa, so every board): when no HDMI display is connected and no USB card is
+there yet, it waits for one (up to 5 s) **in the background** and then configures. The launcher
+sets its volume only after its own 2 s HDMI wait, and `alsactl restore` sets the saved level
+anyway. Docked, or with a USB card already up, nothing changes. Tested: sound undocked.
+
+**Mario Kart 64 could not steer**: the built-in pad has no stick. `input_playerN_analog_dpad_mode`
+works the other way (the stick as a d-pad), so this is a core remap,
+`gpicase2/rootfs_overlay/root/.config/retroarch/config/remaps/ParaLLEl N64/ParaLLEl N64.rmp`:
+d-pad buttons 4/5/6/7 → left stick 19/18/17/16 (Y-, Y+, X-, X+), ports 1 and 2. A remap
+replaces the d-pad on N64, and a DS3 keeps its own stick. Tested: steers.
+
+**On-screen keyboard cut off at 640×480.** Its sizes scale with the height and were tuned for
+16:9: ten 68 px keys are 716 px. The key width is now also capped to fit ten keys between the
+margins (56 px at 640). Tested: fits.
+
+**Slot-10 quick start "not working": the file, not the code.** RetroArch found the copied
+`CTR - Crash Team Racing (USA).state10` (via the launcher's `.state.auto` copy) and the core
+rejected it ("is not a savestate?"): all 2,078,056 bytes were zeros, and the other copied
+slot-10 files were not on the card at all. A copy cut short before Windows wrote the data
+(real states here start with `#RZIPv`). Copy again and eject before pulling the card.
