@@ -278,3 +278,13 @@ margins (56 px at 640). Tested: fits.
 rejected it ("is not a savestate?"): all 2,078,056 bytes were zeros, and the other copied
 slot-10 files were not on the card at all. A copy cut short before Windows wrote the data
 (real states here start with `#RZIPv`). Copy again and eject before pulling the card.
+
+**Image 2026-10-28 21:20** (`firmware/gpicase2/sdcard-small.img.xz`, 84.5 MB; md5 of the
+.img `401910b5f935fa9ff6579a15a1162bde`), for a new card: the old one is likely a fake-capacity
+card. The first build attempt used a **stale `.config`** (from 10-27, before the defconfig gained
+the gpicase2 overlay and lost the ttyS0 getty): no S03latch, the getty back. A defconfig edit
+needs `build.sh gpicase2 defconfig` before the build; everything pushed by hand had hidden it.
+Checked in target/: S03latch, ttyS0 commented out, the battery launcher, the N64 remap, the new
+S11alsa, `remount,rw,noatime,commit=60`, the LCD config.txt, the kernel with panel-simple built in.
+Burned to a new card: everything works and boot is ~10 s. The earlier failures (the zeroed
+state file, the cut-short copies) were the fake card.
