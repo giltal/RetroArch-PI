@@ -10,7 +10,8 @@ on mainline Linux 6.18.53. **One tree, several boards:**
 |---|---|---|
 | Orange Pi Zero3 (`zero3`) | Allwinner H618, Mali-G31 MP2, 2 GB LPDDR4 | The reference board: almost every setting was measured on it |
 | KickPi K2B V2.2 (`k2b`) | Allwinner H618, Mali-G31 MP2, 2 GB DDR3 | Maxio MAE0621A PHY; V1 not supported; no eMMC |
-| Raspberry Pi 4 (`rpi4`) | BCM2711, V3D 4.2 | In progress: family layer `board/bcm2711`, board `board/rpi4`; plan in `docs/boards/rpi4.md` |
+| Raspberry Pi 4 (`rpi4`) | BCM2711, V3D 4.2 | Working: family layer `board/bcm2711`, board `board/rpi4`; notes in `docs/boards/rpi4.md` |
+| GPi Case 2 + CM4 Lite (`gpicase2`) | BCM2711, V3D 4.2 | Stage 1 (docked: HDMI + USB) boots, menu and games run; board `board/gpicase2`; plan in `docs/boards/gpicase2.md` |
 
 History: a port of RetroBPI_M2M (Banana Pi M2 Magic). The Zero3 tree (RetroOPI_Z3) became this
 repo; the K2B was first ported in its own tree and merged here. Both old folders are
@@ -29,8 +30,8 @@ repo; the K2B was first ported in its own tree and merged here. Both old folders
 |---|---|
 | `package/`, `launcher/`, `tools/`, `board/common/` | Shared by every board: RetroArch + cores, launcher, tools, rootfs overlay, shared kernel fragment and patches, post-build (invariants), post-image (exFAT) |
 | `board/h616/` | Shared by the Allwinner H616/H618 boards: Armbian kernel patches, kernel fragment, U-Boot fragment and patches, genimage, boot-chain post-build |
-| `board/bcm2711/` | Raspberry Pi 4 family: kernel fragment, kernel hash, boot-chain post-build |
-| `board/<board>/` | Only that board: DT patches, PHY/board drivers, U-Boot board config, kernel `linux.config`, `extlinux.conf` (Pi 4: `config.txt`, `cmdline.txt`, genimage, fstab) |
+| `board/bcm2711/` | Raspberry Pi 4 family (Pi 4, CM4): kernel fragment, kernel hash, boot-chain post-build, card layout (fstab, S02roms) |
+| `board/<board>/` | Only that board: DT patches, PHY/board drivers, U-Boot board config, kernel `linux.config`, `extlinux.conf` (Pi 4, GPi Case 2: `config.txt`, `cmdline.txt`, genimage) |
 
 A fix found on one board belongs in the most generic layer it applies to. Both defconfigs are
 the same file apart from the board lines: change shared options in **both**, and keep the diff
@@ -129,17 +130,20 @@ C:\RetroArch_PI
   README.md, BUILDING.md, Context.md, DevelopmentLog.md (shared work)
   docs/  flashing.md, boards/<board>.md, log/<board>.md
   buildroot-external/
-    configs/  opi_zero3_retro_defconfig, kickpi_k2b_retro_defconfig, rpi4_retro_defconfig
+    configs/  opi_zero3_retro_defconfig, kickpi_k2b_retro_defconfig, rpi4_retro_defconfig,
+              gpicase2_retro_defconfig
     package/  retroarch (RetroArch + cores, Flycast/PPSSPP patches), retroopi-launcher, retroopi-tools
     board/common/     rootfs_overlay/, linux-retrogaming.config, post-build.sh (invariants), post-image.sh (exFAT),
                       patches/linux (0001 exFAT readahead, both kernels),
                       patches/ (bluez5_utils, libretro-fuse, mesa3d)
     board/h616/       linux-retrogaming.config, uboot-fastboot.config, genimage.cfg, post-build.sh,
                       patches/linux (Armbian 0001-0049 + README), patches/uboot (kernel_addr_r)
-    board/bcm2711/    linux-retrogaming.config, post-build.sh, patches/linux/linux.hash
+    board/bcm2711/    linux-retrogaming.config, post-build.sh, patches/linux/linux.hash,
+                      rootfs_overlay/etc (fstab, init.d/S02roms: the BCM2711 card layout)
     board/opi-zero3/  linux.config, patches/linux (0046/0047/0050/0051), extlinux.conf
     board/kickpi-k2b/ linux.config, patches/linux (0060-0066), patches/uboot (0001-0002), extlinux.conf
-    board/rpi4/       config.txt, cmdline.txt, genimage.cfg, rootfs_overlay/etc/fstab
+    board/rpi4/       config.txt, cmdline.txt, genimage.cfg, rootfs_overlay (LCD: lcdinfo, init file)
+    board/gpicase2/   config.txt, cmdline.txt, genimage.cfg (GPi Case 2 + CM4 Lite)
   launcher/  tools/
   hardware/rpi4-arcade-case/  arcade_case.py (Fusion API script: the source), step/, 3mf/, stl/, README.md
   scripts/   boards.sh, build.sh, board.sh, serial.ps1, fetch-thumbnails.py, gen-*.py,

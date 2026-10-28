@@ -1,6 +1,6 @@
 #!/bin/sh
 #
-# Mount the ROM partition at /opt/roms (Raspberry Pi 4 layout).
+# Mount the ROM partition at /opt/roms (BCM2711 layout: Raspberry Pi 4, CM4).
 #
 # As built it is p4, the fourth PRIMARY partition, and the image's small
 # variant leaves it at 2 GiB so it can be recreated over the whole card. But

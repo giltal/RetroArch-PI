@@ -4,7 +4,7 @@
 #
 #   wsl bash /mnt/c/RetroArch_PI/scripts/board.sh <board> <cmd> [args]
 #
-#   <board> is one of the names in scripts/boards.sh (zero3, k2b, rpi4).
+#   <board> is one of the names in scripts/boards.sh (zero3, k2b, rpi4, gpicase2).
 #
 #   status                 hostname, uptime, IP, what is running, temps, DRM/ALSA
 #   push <path>...         copy target/ files (absolute board paths, e.g.

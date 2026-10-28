@@ -88,13 +88,15 @@ static void startup_mark(const char *stage)
  * ========================================================================= */
 
 /*
- * Output geometry. Set from the Makefile (SCREEN_W / SCREEN_H, which Buildroot
- * takes from BR2_PACKAGE_RETROOPI_LAUNCHER_SCREEN_W/H):
- *   1280x720  -> HDMI 720p, the current target
- *   1920x1080 -> HDMI 1080p, later
+ * Output geometry. The Makefile's SCREEN_W / SCREEN_H (which Buildroot takes
+ * from BR2_PACKAGE_RETROOPI_LAUNCHER_SCREEN_W/H) is the size we want; the size
+ * we get is decided at runtime by drm_pick_mode(). A display that has no such
+ * mode gets the largest one it offers below it: the GPi Case 2's first display,
+ * a "YD2680" monitor, tops out at 1280x720 (2026-10-28), and the launcher used
+ * to exit there with "FATAL: DRM init failed".
  *
- * TODO: query the mode from DRM at runtime instead. ~50 layout constants
- * derive from these, so that is a real refactor, not a rename.
+ * SCREEN_WIDTH / SCREEN_HEIGHT stay the names the ~50 layout constants use;
+ * they are now variables, so every constant derived from them follows.
  */
 #ifndef SCREEN_WIDTH
 #define SCREEN_WIDTH    1280
@@ -102,6 +104,15 @@ static void startup_mark(const char *stage)
 #ifndef SCREEN_HEIGHT
 #define SCREEN_HEIGHT   720
 #endif
+enum { PREF_SCREEN_W = SCREEN_WIDTH, PREF_SCREEN_H = SCREEN_HEIGHT };
+#undef SCREEN_WIDTH
+#undef SCREEN_HEIGHT
+static int g_screen_w = PREF_SCREEN_W, g_screen_h = PREF_SCREEN_H;
+/* Set by the first drm_init(). Buffers sized at that point (the help image)
+ * are kept, so the size is then fixed for the life of the launcher. */
+static bool g_screen_locked;
+#define SCREEN_WIDTH    g_screen_w
+#define SCREEN_HEIGHT   g_screen_h
 #define SCREEN_BPP      32
 #define SCREEN_STRIDE    (SCREEN_WIDTH * 4)
 
@@ -977,7 +988,19 @@ static pixel_t *g_render_buf = NULL;
  * Preference: progressive 60 Hz, then any progressive refresh, then anything
  * of the right size. 1280x720@60 is mandatory for every HDMI sink (CEA-861),
  * so the first tier should always hit for the 720p build.
+ *
+ * A display without the wanted size gets the largest progressive mode that
+ * fits inside it (SCREEN_WIDTH/HEIGHT then become that mode). After the first
+ * init the size is locked, and only that size is accepted.
  */
+static int drm_mode_score(const drmModeModeInfo *m)
+{
+    int score = 1;
+    if (!(m->flags & DRM_MODE_FLAG_INTERLACE)) score += 2;
+    if (m->vrefresh == 60)                     score += 4;
+    return score;
+}
+
 static int drm_pick_mode(const drmModeConnector *conn, drmModeModeInfo *out)
 {
     int best = -1, best_score = -1;
@@ -986,10 +1009,27 @@ static int drm_pick_mode(const drmModeConnector *conn, drmModeModeInfo *out)
         const drmModeModeInfo *m = &conn->modes[i];
         if (m->hdisplay != SCREEN_WIDTH || m->vdisplay != SCREEN_HEIGHT)
             continue;
-        int score = 1;
-        if (!(m->flags & DRM_MODE_FLAG_INTERLACE)) score += 2;
-        if (m->vrefresh == 60)                     score += 4;
+        int score = drm_mode_score(m);
         if (score > best_score) { best_score = score; best = i; }
+    }
+
+    if (best < 0 && !g_screen_locked) {
+        long best_area = 0;
+        for (int i = 0; i < conn->count_modes; i++) {
+            const drmModeModeInfo *m = &conn->modes[i];
+            if ((m->flags & DRM_MODE_FLAG_INTERLACE) ||
+                m->hdisplay > PREF_SCREEN_W || m->vdisplay > PREF_SCREEN_H)
+                continue;
+            long area = (long)m->hdisplay * m->vdisplay;
+            int score = drm_mode_score(m);
+            if (area > best_area || (area == best_area && score > best_score)) {
+                best_area = area; best_score = score; best = i;
+            }
+        }
+        if (best >= 0)
+            fprintf(stderr, "DRM: display offers no %dx%d mode, using %dx%d\n",
+                    SCREEN_WIDTH, SCREEN_HEIGHT,
+                    conn->modes[best].hdisplay, conn->modes[best].vdisplay);
     }
 
     if (best < 0) {
@@ -1002,6 +1042,9 @@ static int drm_pick_mode(const drmModeConnector *conn, drmModeModeInfo *out)
         return -1;
     }
     *out = conn->modes[best];
+    g_screen_w = out->hdisplay;
+    g_screen_h = out->vdisplay;
+    g_screen_locked = true;
     return 0;
 }
 
@@ -1416,18 +1459,31 @@ static const PixelIcon *icon_find(const char *name)
     return NULL;
 }
 
-/* Each icon pixel becomes a scale x scale block: nearest neighbour, so the
- * pixel art stays crisp at any size. NULL draws nothing. */
-static void gfx_draw_icon(const PixelIcon *ic, int x, int y, int scale)
+/* Draw an icon into a box x box square: nearest neighbour, so the pixel art
+ * stays crisp. Icon pixel c covers [c * box / size, (c + 1) * box / size), so
+ * a box that is a multiple of the size gives even blocks, and a smaller one
+ * (a 64-pixel icon in a 720p list row) shrinks it. NULL draws nothing. */
+static void gfx_draw_icon(const PixelIcon *ic, int x, int y, int box)
 {
     if (!ic) return;
-    for (int r = 0; r < ic->size; r++)
+    for (int r = 0; r < ic->size; r++) {
+        int y0 = r * box / ic->size, y1 = (r + 1) * box / ic->size;
         for (int c = 0; c < ic->size; c++) {
             char p = ic->pixels[r * ic->size + c];
-            if (p >= '0' && p <= '8')
-                gfx_fill_rect(x + c * scale, y + r * scale, scale, scale,
+            int x0 = c * box / ic->size, x1 = (c + 1) * box / ic->size;
+            if (p >= '0' && p <= '8' && x1 > x0 && y1 > y0)
+                gfx_fill_rect(x + x0, y + y0, x1 - x0, y1 - y0,
                               (pixel_t)ic->palette[p - '0']);
         }
+    }
+}
+
+/* The side of the box a list icon is drawn in: the largest whole multiple of
+ * ICON_SIZE that fits the row (64 at 1080p), else the room the row has. */
+static int list_icon_box(void)
+{
+    int avail = ITEM_HEIGHT - UI_SCALE(8);
+    return avail >= ICON_SIZE ? avail / ICON_SIZE * ICON_SIZE : avail;
 }
 
 /* Draw a rounded-ish pill highlight (simple: just a filled rect with 1px inset) */
@@ -1512,8 +1568,19 @@ static void gfx_draw_star(int cx, int cy, int outer_r, int inner_r, pixel_t colo
 #define BTN_R1_MASK      (1 << 9)
 #define BTN_PS_MASK      (1 << 12)
 
+#define MAX_PADS 4
+
 typedef struct {
     int fd;
+    int evnum;          /* /dev/input/event<evnum> */
+    bool pad;           /* a gamepad (else the fallback device) */
+    int lo[2], hi[2];   /* ABS_X/ABS_Y: below lo / above hi is a d-pad press */
+} PadDev;
+
+typedef struct {
+    PadDev dev[MAX_PADS];   /* every gamepad, read together */
+    int count;
+    double next_scan;   /* startup_now_ms() of the next hot-plug scan */
     uint32_t held;      /* Currently held buttons */
     uint32_t pressed;   /* Just pressed this frame */
     uint32_t released;  /* Just released this frame */
@@ -1585,12 +1652,74 @@ static uint32_t evdev_to_mask(uint16_t code)
     return 0;
 }
 
-static int input_find_gamepad(void)
+/* What an input device is to us. A gamepad or joystick is read; a device with
+ * keys and axes that is not a touchscreen is a fallback, read only when no
+ * gamepad is present. */
+enum { DEV_NONE, DEV_FALLBACK, DEV_PAD };
+
+static int input_classify(int fd)
+{
+    unsigned long keybits[16] = {0};
+    ioctl(fd, EVIOCGBIT(EV_KEY, sizeof(keybits)), keybits);
+#define HAS_KEY(k) (keybits[(k) / (sizeof(long) * 8)] & (1UL << ((k) % (sizeof(long) * 8))))
+
+    /* BTN_GAMEPAD (= BTN_SOUTH): a gamepad. BTN_JOYSTICK: a generic HID one. */
+    if (HAS_KEY(BTN_GAMEPAD) || HAS_KEY(BTN_JOYSTICK))
+        return DEV_PAD;
+
+    unsigned long evbits[2] = {0};
+    ioctl(fd, EVIOCGBIT(0, sizeof(evbits)), evbits);
+    if ((evbits[0] & (1 << EV_KEY)) && (evbits[0] & (1 << EV_ABS)) && !HAS_KEY(BTN_TOUCH))
+        return DEV_FALLBACK;
+#undef HAS_KEY
+    return DEV_NONE;
+}
+
+/* Adds a device to the read set; its stick thresholds come from its own axis
+ * range (the DS3 reports 0..255, the GPi Case 2's Xbox 360 pad -32768..32767). */
+static void input_add(int fd, int evnum, const char *what, const char *name)
+{
+    PadDev *d = &g_input.dev[g_input.count++];
+    d->fd = fd;
+    d->evnum = evnum;
+    for (int a = 0; a < 2; a++) {
+        struct input_absinfo ai = { .minimum = 0, .maximum = 255 };
+        ioctl(fd, EVIOCGABS(a == 0 ? ABS_X : ABS_Y), &ai);
+        int q = (ai.maximum - ai.minimum) / 4;
+        d->lo[a] = ai.minimum + q;          /* 64 / 192 on the DS3 */
+        d->hi[a] = ai.maximum - q;
+    }
+    printf("INPUT: %s '%s' at /dev/input/event%d\n", what, name, evnum);
+}
+
+static bool input_is_open(int evnum)
+{
+    for (int i = 0; i < g_input.count; i++)
+        if (g_input.dev[i].evnum == evnum)
+            return true;
+    return false;
+}
+
+/*
+ * Opens every gamepad not open yet. The launcher reads all of them, so a pad
+ * plugged in later works too: the GPi Case 2's built-in pad was found first
+ * and a DS3 plugged into the dock was ignored (2026-10-28). A fallback device
+ * is only taken when there is no gamepad at all.
+ */
+static void input_scan(void)
 {
     char path[64];
-    int fallback_fd = -1;
+    int fallback_fd = -1, fallback_num = -1;
+    char fallback_name[256] = "";
+    bool have_pad = false;
 
-    for (int i = 0; i < 10; i++) {
+    for (int i = 0; i < g_input.count; i++)
+        if (g_input.dev[i].pad)
+            have_pad = true;
+
+    for (int i = 0; i < 32 && g_input.count < MAX_PADS; i++) {
+        if (input_is_open(i))
+            continue;
         snprintf(path, sizeof(path), "/dev/input/event%d", i);
         int fd = open(path, O_RDONLY | O_NONBLOCK);
         if (fd < 0) continue;
@@ -1598,62 +1727,34 @@ static int input_find_gamepad(void)
         char name[256] = "";
         ioctl(fd, EVIOCGNAME(sizeof(name)), name);
 
-        /* Check key capabilities */
-        unsigned long keybits[16] = {0};
-        ioctl(fd, EVIOCGBIT(EV_KEY, sizeof(keybits)), keybits);
-
-        /* BTN_GAMEPAD (0x130) — definitive gamepad identification */
-        int btn_gamepad_word = 0x130 / (sizeof(long) * 8);
-        int btn_gamepad_bit  = 0x130 % (sizeof(long) * 8);
-        if (keybits[btn_gamepad_word] & (1UL << btn_gamepad_bit)) {
-            printf("INPUT: found gamepad '%s' at %s\n", name, path);
-            if (fallback_fd >= 0) close(fallback_fd);
-            return fd;
-        }
-
-        /* BTN_SOUTH (0x130 already checked above), BTN_A (0x130),
-         * also check BTN_JOYSTICK (0x120) for generic HID gamepads */
-        int btn_joy_word = 0x120 / (sizeof(long) * 8);
-        int btn_joy_bit  = 0x120 % (sizeof(long) * 8);
-        if (keybits[btn_joy_word] & (1UL << btn_joy_bit)) {
-            printf("INPUT: found joystick '%s' at %s\n", name, path);
-            if (fallback_fd >= 0) close(fallback_fd);
-            return fd;
-        }
-
-        /* Has EV_KEY and EV_ABS but not touchscreen — keep as fallback */
-        unsigned long evbits[2] = {0};
-        ioctl(fd, EVIOCGBIT(0, sizeof(evbits)), evbits);
-        if ((evbits[0] & (1 << EV_KEY)) && (evbits[0] & (1 << EV_ABS))) {
-            /* Skip touchscreens: check for BTN_TOUCH (0x14a) without BTN_GAMEPAD */
-            int btn_touch_word = BTN_TOUCH / (sizeof(long) * 8);
-            int btn_touch_bit  = BTN_TOUCH % (sizeof(long) * 8);
-            if (keybits[btn_touch_word] & (1UL << btn_touch_bit)) {
-                /* Has BTN_TOUCH — this is a touchscreen, skip */
-                close(fd);
-                continue;
-            }
-            /* Keep as fallback */
-            if (fallback_fd >= 0) close(fallback_fd);
+        int kind = input_classify(fd);
+        if (kind == DEV_PAD) {
+            input_add(fd, i, "found gamepad", name);
+            g_input.dev[g_input.count - 1].pad = true;
+            have_pad = true;
+        } else if (kind == DEV_FALLBACK && fallback_fd < 0) {
             fallback_fd = fd;
-            printf("INPUT: fallback candidate '%s' at %s\n", name, path);
-            continue;
+            fallback_num = i;
+            snprintf(fallback_name, sizeof(fallback_name), "%s", name);
+        } else {
+            close(fd);
         }
-
-        close(fd);
     }
 
-    if (fallback_fd >= 0)
-        return fallback_fd;
-
-    return -1;
+    if (fallback_fd >= 0) {
+        if (!have_pad && g_input.count == 0 && g_input.count < MAX_PADS)
+            input_add(fallback_fd, fallback_num, "fallback", fallback_name);
+        else
+            close(fallback_fd);
+    }
 }
 
 static int input_init(void)
 {
     memset(&g_input, 0, sizeof(g_input));
-    g_input.fd = input_find_gamepad();
-    if (g_input.fd < 0) {
+    input_scan();
+    g_input.next_scan = startup_now_ms() + 2000;
+    if (g_input.count == 0) {
         fprintf(stderr, "INPUT: no gamepad found\n");
         return -1;
     }
@@ -1666,58 +1767,60 @@ static void input_poll(void)
     struct input_event ev;
     ssize_t n;
 
-    if (g_input.fd < 0) {
-        /* Try to find a gamepad again */
-        g_input.fd = input_find_gamepad();
-        if (g_input.fd < 0)
-            goto out;
+    /* Hot-plug: look for new pads every 2 s (a few open() calls). */
+    if (startup_now_ms() >= g_input.next_scan) {
+        input_scan();
+        g_input.next_scan = startup_now_ms() + 2000;
     }
 
-    while ((n = read(g_input.fd, &ev, sizeof(ev))) == sizeof(ev)) {
-        if (ev.type == EV_KEY) {
-            uint32_t mask = evdev_to_mask(ev.code);
-            if (mask) {
-                if (ev.value) /* pressed or repeat */
-                    g_input.held |= mask;
-                else
-                    g_input.held &= ~mask;
+    for (int i = 0; i < g_input.count; i++) {
+        PadDev *d = &g_input.dev[i];
+        while ((n = read(d->fd, &ev, sizeof(ev))) == sizeof(ev)) {
+            if (ev.type == EV_KEY) {
+                uint32_t mask = evdev_to_mask(ev.code);
+                if (mask) {
+                    if (ev.value) /* pressed or repeat */
+                        g_input.held |= mask;
+                    else
+                        g_input.held &= ~mask;
+                }
+            }
+            /* Handle d-pad as axis (ABS_HAT0X/Y or ABS_X/Y analog stick) */
+            else if (ev.type == EV_ABS) {
+                if (ev.code == ABS_HAT0X) {
+                    g_input.held &= ~(BTN_LEFT_MASK | BTN_RIGHT_MASK);
+                    if (ev.value < 0)      g_input.held |= BTN_LEFT_MASK;
+                    else if (ev.value > 0) g_input.held |= BTN_RIGHT_MASK;
+                }
+                else if (ev.code == ABS_HAT0Y) {
+                    g_input.held &= ~(BTN_UP_MASK | BTN_DOWN_MASK);
+                    if (ev.value < 0)      g_input.held |= BTN_UP_MASK;
+                    else if (ev.value > 0) g_input.held |= BTN_DOWN_MASK;
+                }
+                /* Left analog stick as d-pad: the outer quarters of its range */
+                else if (ev.code == ABS_X) {
+                    g_input.held &= ~(BTN_LEFT_MASK | BTN_RIGHT_MASK);
+                    if (ev.value < d->lo[0])      g_input.held |= BTN_LEFT_MASK;
+                    else if (ev.value > d->hi[0]) g_input.held |= BTN_RIGHT_MASK;
+                }
+                else if (ev.code == ABS_Y) {
+                    g_input.held &= ~(BTN_UP_MASK | BTN_DOWN_MASK);
+                    if (ev.value < d->lo[1])      g_input.held |= BTN_UP_MASK;
+                    else if (ev.value > d->hi[1]) g_input.held |= BTN_DOWN_MASK;
+                }
             }
         }
-        /* Handle d-pad as axis (ABS_HAT0X/Y or ABS_X/Y analog stick) */
-        else if (ev.type == EV_ABS) {
-            if (ev.code == ABS_HAT0X) {
-                g_input.held &= ~(BTN_LEFT_MASK | BTN_RIGHT_MASK);
-                if (ev.value < 0)      g_input.held |= BTN_LEFT_MASK;
-                else if (ev.value > 0) g_input.held |= BTN_RIGHT_MASK;
-            }
-            else if (ev.code == ABS_HAT0Y) {
-                g_input.held &= ~(BTN_UP_MASK | BTN_DOWN_MASK);
-                if (ev.value < 0)      g_input.held |= BTN_UP_MASK;
-                else if (ev.value > 0) g_input.held |= BTN_DOWN_MASK;
-            }
-            /* Left analog stick as d-pad (0-255, center 128) */
-            else if (ev.code == ABS_X) {
-                g_input.held &= ~(BTN_LEFT_MASK | BTN_RIGHT_MASK);
-                if (ev.value < 64)       g_input.held |= BTN_LEFT_MASK;
-                else if (ev.value > 192) g_input.held |= BTN_RIGHT_MASK;
-            }
-            else if (ev.code == ABS_Y) {
-                g_input.held &= ~(BTN_UP_MASK | BTN_DOWN_MASK);
-                if (ev.value < 64)       g_input.held |= BTN_UP_MASK;
-                else if (ev.value > 192) g_input.held |= BTN_DOWN_MASK;
-            }
+
+        /* Detect device disconnection (stale fd) */
+        if (n < 0 && errno != EAGAIN && errno != EWOULDBLOCK) {
+            fprintf(stderr, "INPUT: event%d lost (errno=%d)\n", d->evnum, errno);
+            close(d->fd);
+            g_input.dev[i] = g_input.dev[--g_input.count];
+            g_input.held = 0;
+            i--;
         }
     }
 
-    /* Detect device disconnection (stale fd) */
-    if (n < 0 && errno != EAGAIN && errno != EWOULDBLOCK) {
-        fprintf(stderr, "INPUT: device lost (errno=%d), will re-scan\n", errno);
-        close(g_input.fd);
-        g_input.fd = -1;
-        g_input.held = 0;
-    }
-
-out:
     g_input.pressed  = g_input.held & ~prev;
     g_input.released = prev & ~g_input.held;
 
@@ -1736,8 +1839,9 @@ out:
 
 static void input_cleanup(void)
 {
-    if (g_input.fd >= 0) close(g_input.fd);
-    g_input.fd = -1;
+    for (int i = 0; i < g_input.count; i++)
+        close(g_input.dev[i].fd);
+    g_input.count = 0;
 }
 
 /* =========================================================================
@@ -2827,7 +2931,7 @@ static void ui_draw_header(const char *title)
         int scale = (HEADER_HEIGHT - UI_SCALE(10)) / size;
         if (scale < 1) scale = 1;
         int x = PADDING_X;
-        gfx_draw_icon(ship, x, (HEADER_HEIGHT - size * scale) / 2, scale);
+        gfx_draw_icon(ship, x, (HEADER_HEIGHT - size * scale) / 2, size * scale);
         x += size * scale + UI_SCALE(6);
         gfx_draw_text(g_font_header, "RETRO", x, UI_SCALE(8), COL_SYSTEM_ICON, 0);
         int w = 0;
@@ -3048,7 +3152,8 @@ static void ui_draw_preview(void)
         if (ic) {
             int scale = (box_w < box_h ? box_w : box_h) / 2 / ic->size;
             if (scale < 1) scale = 1;
-            gfx_draw_icon(ic, x0 + (w - ic->size * scale) / 2, y0 + (h - ic->size * scale) / 2, scale);
+            gfx_draw_icon(ic, x0 + (w - ic->size * scale) / 2, y0 + (h - ic->size * scale) / 2,
+                          ic->size * scale);
         }
     }
 }
@@ -3206,12 +3311,10 @@ static void ui_draw_list(void)
         /* Systems and Settings lists: a pixel-art icon left of the name */
         int text_x = PADDING_X + UI_SCALE(4);
         if (g_menu.mode == MENU_SYSTEMS || g_menu.mode == MENU_SETTINGS) {
-            int scale = (ITEM_HEIGHT - UI_SCALE(8)) / ICON_SIZE;  /* list icons are ICON_SIZE */
-            if (scale < 1) scale = 1;
-            int box = ICON_SIZE * scale;
+            int box = list_icon_box();
             if (g_menu.mode == MENU_SETTINGS) {
                 gfx_draw_icon(idx < SETTING_COUNT ? icon_find(setting_icons[idx]) : NULL,
-                              text_x, y + (ITEM_HEIGHT - box) / 2, scale);
+                              text_x, y + (ITEM_HEIGHT - box) / 2, box);
             } else if (e->system_idx == -100) {
                 /* Settings: the gear glyph, centred in the icon column */
                 const char *gear = "\xe2\x9a\x99";
@@ -3220,7 +3323,7 @@ static void ui_draw_list(void)
                 gfx_draw_text(g_font_header, gear, text_x + (box - gw) / 2,
                               y + (ITEM_HEIGHT - gh) / 2, COL_TEXT, 0);
             } else {
-                gfx_draw_icon(menu_entry_icon(e), text_x, y + (ITEM_HEIGHT - box) / 2, scale);
+                gfx_draw_icon(menu_entry_icon(e), text_x, y + (ITEM_HEIGHT - box) / 2, box);
             }
             text_x += box + UI_SCALE(10);
             text_max_w -= box + UI_SCALE(10);
@@ -3680,15 +3783,14 @@ static int search_run(void)
     };
 
     /* Keyboard geometry (comments give the values at 480 lines) */
-    enum {
+    const int
         KW  = UI_SCALE(68),  KH  = UI_SCALE(38),  KG  = UI_SCALE(4),
         KRP = KH + KG,                      /* 42 row pitch */
         KY0 = UI_SCALE(270),                /* first row Y */
         KLT = HEADER_HEIGHT + 4,            /* list top */
         KLB = KY0 - UI_SCALE(4),            /* list bottom */
         KIH = UI_SCALE(36),                 /* list item height */
-        KLV = (KLB - KLT) / KIH             /* visible items (~6) */
-    };
+        KLV = (KLB - KLT) / KIH;            /* visible items (~6) */
 
     int filt[MAX_ENTRIES];
     int fcnt = 0, fsel = 0, fscr = 0;
@@ -4038,18 +4140,27 @@ static void launch_game(const char *rom_path, int system_idx, int state_slot)
                 if (dst) fclose(dst);
             }
 
-            /* Write temp config: enable auto-load and set slot for future saves */
-            const char *tmp_cfg = "/tmp/ra_slot.cfg";
-            FILE *fc = fopen(tmp_cfg, "w");
-            if (fc) {
+        }
+
+        /* Temp config, appended to retroarch.cfg. The screen size: RetroArch
+         * fails ("Did not find suitable video mode") when the display has no
+         * mode of retroarch.cfg's video_fullscreen_x/y, so it gets the mode
+         * the launcher found (drm_pick_mode). With a state: enable auto-load
+         * and set the slot for future saves. */
+        const char *tmp_cfg = "/tmp/ra_launch.cfg";
+        FILE *fc = fopen(tmp_cfg, "w");
+        if (fc) {
+            fprintf(fc, "video_fullscreen_x = \"%d\"\n", SCREEN_WIDTH);
+            fprintf(fc, "video_fullscreen_y = \"%d\"\n", SCREEN_HEIGHT);
+            if (state_slot >= 0) {
                 fprintf(fc, "savestate_auto_load = \"true\"\n");
                 /* A quick start loads slot 10 but saves (PS + R) go to slot
                  * 0 as usual: slot 10 is a bookmark (and the game tests'
                  * start point), changed only on purpose from the menu. */
                 fprintf(fc, "state_slot = \"%d\"\n",
                         state_slot == QUICK_SLOT ? 0 : state_slot);
-                fclose(fc);
             }
+            fclose(fc);
             execl(RETROARCH_BIN, "retroarch",
                   "-L", core_path,
                   "--appendconfig", tmp_cfg,
@@ -4088,8 +4199,9 @@ static void launch_game(const char *rom_path, int system_idx, int state_slot)
        doesn't immediately re-trigger a game launch */
     {
         struct input_event ev;
-        while (read(g_input.fd, &ev, sizeof(ev)) == sizeof(ev))
-            ; /* discard */
+        for (int i = 0; i < g_input.count; i++)
+            while (read(g_input.dev[i].fd, &ev, sizeof(ev)) == sizeof(ev))
+                ; /* discard */
         g_input.held = 0;
         g_input.pressed = 0;
         g_input.released = 0;
@@ -4153,8 +4265,7 @@ int main(int argc, char *argv[])
     startup_now_ms();	/* starts the clock */
 
     printf("=== RetroOPI Launcher ===\n");
-    printf("Platform: Orange Pi Zero3 (Allwinner H618), %dx%d\n",
-           SCREEN_WIDTH, SCREEN_HEIGHT);
+    printf("Screen: %dx%d wanted\n", SCREEN_WIDTH, SCREEN_HEIGHT);
 
     signal(SIGINT, sig_handler);
     signal(SIGTERM, sig_handler);

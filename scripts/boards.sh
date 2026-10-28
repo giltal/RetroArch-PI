@@ -11,7 +11,7 @@
 #   BOARD_BOOT       boot chain: extlinux (U-Boot + extlinux.conf in the rootfs's
 #                    /boot) or rpi (Pi firmware + config.txt on a FAT boot partition)
 
-BOARDS="zero3 k2b rpi4"
+BOARDS="zero3 k2b rpi4 gpicase2"
 
 case "${1:-}" in
 	zero3)
@@ -33,6 +33,13 @@ case "${1:-}" in
 		BOARD_DEFCONFIG=rpi4_retro_defconfig
 		BOARD_WORK=~/rpi4
 		BOARD_DTB=bcm2711-rpi-4-b.dtb
+		BOARD_BOOT=rpi
+		;;
+	gpicase2)
+		BOARD_NAME="GPi Case 2 (CM4)"
+		BOARD_DEFCONFIG=gpicase2_retro_defconfig
+		BOARD_WORK=~/gpicase2
+		BOARD_DTB=bcm2711-rpi-cm4.dtb
 		BOARD_BOOT=rpi
 		;;
 	*)

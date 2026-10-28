@@ -7,12 +7,14 @@ tmpfs		/tmp		tmpfs	mode=1777	0	0
 tmpfs		/run		tmpfs	mode=0755,nosuid,nodev	0	0
 sysfs		/sys		sysfs	defaults	0	0
 
-# Raspberry Pi 4 layout (board/rpi4/genimage.cfg): p1 FAT boot (not mounted),
-# p2 rootfs, p3 /data, p4 ROMs. Replaces board/common's fstab, whose ROM
-# partition is p2 (the H616 layout). Keep the lines below in step with it.
+# BCM2711 layout (board/rpi4/genimage.cfg, board/gpicase2/genimage.cfg): p1 FAT
+# boot (not mounted), p2 rootfs, p3 /data, p4 ROMs. Replaces board/common's
+# fstab, whose ROM partition is p2 (the H616 layout). Keep the lines below in
+# step with it.
 #
-# mmcblk0 is the SD card: the Pi 4's device tree aliases emmc2 (the SD slot)
-# as mmc0, and the other MMC host (the Wi-Fi SDIO) as mmc1.
+# mmcblk0 is the SD card: the Pi 4's and the CM4's device trees alias emmc2 (the
+# SD slot, or a CM4's eMMC) as mmc0, and the other MMC host (the Wi-Fi SDIO) as
+# mmc1.
 
 # /data: the journaled ext4 partition for what must persist once the root is
 # read-only (docs/boards/rpi4.md). Empty as built.

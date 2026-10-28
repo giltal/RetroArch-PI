@@ -1,4 +1,7 @@
-# Board — Retroflag GPi Case 2 + Compute Module 4 (assessment, not started)
+# Board — Retroflag GPi Case 2 + Compute Module 4
+
+> **Status 2026-10-28: stage 1 (docked) boots; menu and games run (720p display).** Board layer `board/gpicase2`,
+> first-boot checklist in `docs/log/gpicase2.md`.
 
 > Fourth target, and the first handheld. A Compute Module 4 (BCM2711, the Pi 4's SoC) in
 > Retroflag's GPi Case 2: a 3.0" 640×480 LCD, built-in controls, speaker and headphone jack,
@@ -62,7 +65,8 @@ stack as ours, which settles most open questions. Two stages:
 
 ## Still open
 
-1. The CM4's **RAM size** and whether it has **Wi-Fi** (not needed: USB Ethernet).
+1. Whether the CM4 has **Wi-Fi** (not needed: USB Ethernet). RAM: **1 GB** (board `a03141`,
+   bootloader 2023-01-11, seen on the boot screen 2026-10-28).
 2. Whether the case presents anything on HDMI-A-1 when **undocked** (Recalbox's detection
    also reads an EDID). Check on the hardware at the first boot.
 
