@@ -288,3 +288,33 @@ Checked in target/: S03latch, ttyS0 commented out, the battery launcher, the N64
 S11alsa, `remount,rw,noatime,commit=60`, the LCD config.txt, the kernel with panel-simple built in.
 Burned to a new card: everything works and boot is ~10 s. The earlier failures (the zeroed
 state file, the cut-short copies) were the fake card.
+
+## 2026-10-29 — Atari 800 silent on the LCD: mono POKEY in the left channel only
+
+Only Atari 800 was silent on the speaker; HDMI played it. A debug wrapper logging to the ROM
+card (the case is unreachable undocked: Ethernet is in the dock) showed the core producing
+sound (peak −13 dBFS) into the USB card at 48 kHz, volume up, stream running. The cause is in
+the core: `PLATFORM_SoundSetup()` forced 2 channels, and `Sound_Setup()` passes that count to
+`POKEYSND_Init()` as the number of POKEYs. In the default mono mode the second POKEY is never
+written, so the game was in the left channel and the right was silence, while the core's own
+mono→both path never ran. The case's speaker plays the right channel; a stereo TV still played
+the left. `0002-atari800-mono-pokey-to-both-channels.patch` keeps the requested channel count.
+Measured (5200 Astro Chase, docked): same peak, rms +3.0 dB (the right channel now carries it).
+Heard on the speaker. Affects every board (Atari was one-sided on HDMI too), probably part of
+the "weak" Atari sound on the Zero3; `Atari800.cfg`'s +8 dB is per-channel peak and still holds.
+
+Also seen: in LCD mode RetroArch re-inits the audio driver several times per Atari launch
+(the core's `SET_SYSTEM_AV_INFO` with unchanged values, refresh 59.94 → 60.000). Harmless here:
+the USB card's stream runs normally after each re-open.
+
+**Checked every other core for the same bug** (docked; ALSA `file` plugin capturing exactly what
+RetroArch sends, compared per channel; a virtual pad pressed coin/start/fire to get past silent
+title screens). All carry sound in both channels:
+L = R exactly (mono): fceumm, gambatte, genesisplusgx, stella2023, prosystem, fuse,
+mame2003plus, ppsspp, gpsp, atari800 (patched). Real stereo with matched levels (L/R rms within
+2 dB): snes9x2005, beetlepcefast, beetlesupergrafx, pcsx_rearmed, fbalpha2012, parallel-n64,
+flycast. Not tested: prboom (no WAD on the card). Atari 800 was the only one-sided core.
+Seen on the way: Advance Wars 2 (gpSP) does not start (no frames, no audio), with no GBA BIOS
+on the card; other GBA games run. Tooling notes: the `file` plugin needs a real slave (`null`
+does not pace: 475 MB in 15 s filled /tmp), and `file "|cat >> f"`, because every audio
+re-init re-opens and truncates a plain file.

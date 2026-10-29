@@ -1,0 +1,39 @@
+atari800: output mono POKEY to both channels
+
+PLATFORM_SoundSetup() forced 2 channels whatever the core asked for.
+Sound_Setup() hands that count to POKEYSND_Init() as the number of
+POKEY chips, so in the default mono mode (atari800_pokey_stereo
+disabled: Sound_desired.channels = 1) the core emulated a second POKEY
+that nothing writes. The left channel carried the game, the right
+channel was silence, and retro_sound_update()'s mono path (copy the
+one channel to both) never ran.
+
+Found on the GPi Case 2, whose speaker plays the right channel: Atari
+800 was the only silent system there, while HDMI (stereo TV) still
+played it from the left side. Probably also why this core sounded weak
+on the Orange Pi Zero3.
+
+Keep the requested channel count: 1 normally, 2 with the stereo POKEY
+option on (two real POKEYs, as before).
+
+Signed-off-by: RetroArch-PI
+--- a/libretro/platform.c
++++ b/libretro/platform.c
+@@ -1036,10 +1036,15 @@
+ 
+ int PLATFORM_SoundSetup(Sound_setup_t *setup)
+ {
+-	//force 16 bit stereo sound at 44100
++	/* 16 bit at 44100. Keep the requested channel count (1 unless the
++	   atari800_pokey_stereo option is on): Sound_Setup() passes it to
++	   POKEYSND_Init() as the number of POKEYs, so forcing 2 emulated a
++	   second, never-written POKEY in the right channel and left mono
++	   games in the left channel only. */
+ 	setup->freq=44100;
+ 	setup->sample_size=2;
+-	setup->channels=2;
++	if (setup->channels < 1 || setup->channels > 2)
++		setup->channels = 1;
+ //	setup->buffer_ms=20;
+ 	setup->buffer_frames = 1024;
+ 
